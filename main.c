@@ -14,8 +14,23 @@
 #define ABUF_INIT { NULL, 0 }
 #define VERSION "0.0.0.1"
 
+enum KEYS {
+    ARROW_LEFT = 1000,
+    ARROW_RIGHT,
+    ARROW_DOWN,
+    ARROW_UP,
+    
+    PAGE_DOWN,
+    PAGE_UP,
+    HOME,
+    END,
+    
+    DELETE,
+};
+
 struct CONFIG {
     struct termios original_termios;
+    int cursor_x, cursor_y;
     int screen_rows;
     int screen_cols;
 };
@@ -39,13 +54,14 @@ void enable_raw_mode(void);
 void draw_rows(struct ABUF *buffer);
 void refresh_screen(void);
 
+void move_cursor(int key);
 void key_press(void);
-char read_key(void);
+int read_key(void);
 
 struct CONFIG g_editor;
 
 // /------------------------------------------------\
-// |                 FUNCTIONS                      |
+// |                   FUNCTIONS                    |
 // \------------------------------------------------/
 
 
@@ -62,6 +78,8 @@ void init_editor(void) {
     if (get_window_size(&g_editor.screen_rows, &g_editor.screen_cols) == -1) {
 	error("get window size");
     }
+    g_editor.cursor_x = 0;
+    g_editor.cursor_y = 0;
     return;
 }
 
@@ -135,7 +153,7 @@ void draw_rows(struct ABUF *buffer) {
     for (int y = 0; y < g_editor.screen_rows; y++) {
 	if (y == g_editor.screen_rows / 3) {
 	    char welcome[80];
-	    int w = snprintf(welcome, sizeof(welcome), "Welcome to Charlie text g_editor [%s]", VERSION);
+	    int w = snprintf(welcome, sizeof(welcome), "Welcome to Charlie text editor [%s]", VERSION);
 	    
 	    if (w > g_editor.screen_cols) w = g_editor.screen_cols;
 	    int padding = (g_editor.screen_cols - w) / 2;
@@ -161,9 +179,13 @@ void refresh_screen(void) {
     struct ABUF buffer = ABUF_INIT;
     buffer_append(&buffer, "\x1b[?25l", 6);
     buffer_append(&buffer, "\x1b[H", 3);
+    
     draw_rows(&buffer);
     
-    buffer_append(&buffer, "\x1b[H", 3);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", g_editor.cursor_y + 1, g_editor.cursor_x + 1);
+    buffer_append(&buffer, buf, strlen(buf));
+    
     buffer_append(&buffer, "\x1b[?25h", 6);
     
     write(STDOUT_FILENO, buffer.buffer, buffer.length);
@@ -171,24 +193,110 @@ void refresh_screen(void) {
     return;
 }
 
+void move_cursor(int key) {
+    switch (key) {
+    case ARROW_LEFT:
+	if (g_editor.cursor_x != 0) g_editor.cursor_x--;
+	break;
+    case ARROW_RIGHT:
+	if (g_editor.cursor_x != g_editor.screen_cols - 1) g_editor.cursor_x++;
+	break;
+    case ARROW_UP:
+	if (g_editor.cursor_y != 0) g_editor.cursor_y--;
+	break;
+    case ARROW_DOWN:
+	if (g_editor.cursor_y != g_editor.screen_rows - 1) g_editor.cursor_y++;
+	break;
+    }
+}
+
 void key_press(void) {
-    char c = read_key();
+    int c = read_key();
+    
     switch (c) {
     case 27:
 	write(STDOUT_FILENO, "\x1b[2J", 4);
 	write(STDOUT_FILENO, "\x1b[H", 3);
 	exit(0);
 	break;
+	
+    case HOME:
+	g_editor.cursor_x = 0;
+	break;
+    case END:
+	g_editor.cursor_x = g_editor.screen_cols - 1;
+	break;
+    case PAGE_DOWN:
+    case PAGE_UP:
+	{
+	    int times = g_editor.screen_rows;
+	    while (times--) {
+		move_cursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN); // NOTE: I didn't know C could do that. Thanks tutorial.
+	    }
+	}
+	break;
+    case ARROW_UP:
+    case ARROW_DOWN:
+    case ARROW_LEFT:
+    case ARROW_RIGHT:
+      move_cursor(c);
+      break;
     }
     return;
 }
 
-char read_key(void) {
+int read_key(void) {
     int nread; char c;
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
 	if (nread == -1 && errno != EAGAIN) error("read");
     }
-    return c;
+    
+    if (c == '\x1b') {
+	char sequence[3];
+	
+	if (read(STDIN_FILENO, &sequence[0], 1) != 1) return '\x1b';
+	if (read(STDIN_FILENO, &sequence[1], 1) != 1) return '\x1b';
+	if (sequence[0] == '[') {
+	    if (sequence[1] >=-'0' && sequence[1] <= '9') {
+		if (read(STDIN_FILENO, &sequence[2], 1) != 1) return '\x1b';
+		if (sequence[2] == '~') {
+		    switch (sequence[1]) {
+		        case '6': return PAGE_DOWN;
+			case '5': return PAGE_UP;
+		        case '1': return HOME;
+		        case '7': return HOME;
+			case '4': return END;
+			case '8': return END;
+			
+			case '3': return DELETE;
+		    }
+		}
+	    } else {
+		switch (sequence[1]) {
+		    case 'A': return ARROW_UP;
+		    case 'B': return ARROW_DOWN;
+		    case 'C': return ARROW_RIGHT;
+		    case 'D': return ARROW_LEFT;
+		    case 'H': return HOME;
+		    case 'F': return END;
+		}
+	    }
+	} else if (sequence[0] == 'O') {
+	    switch (sequence[1]) {
+	        case 'H': return HOME;
+		case 'F': return END;
+	    }
+	}
+	return '\x1b';
+    } else {
+	switch (c) {
+	    case CTRL_KEY('f'): return ARROW_RIGHT;
+	    case CTRL_KEY('b'): return ARROW_LEFT;
+	    case CTRL_KEY('n'): return ARROW_DOWN;
+	    case CTRL_KEY('p'): return ARROW_UP;
+	    default:            return c;
+	}
+    }
 }
 
 int main(void) {
