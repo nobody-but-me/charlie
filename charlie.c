@@ -140,10 +140,26 @@ void enableRawMode(void) {
 
 void drawRows(struct ABUF *bff) {
     for (unsigned int y = 0; y < g_Configuration.screenRows; y++) {
-	bufferAppend(bff, COLUMN_SYMBOL, 1);
+	if (y == g_Configuration.screenRows / 2) {
+	    char welcomeMessage[80];
+	    unsigned int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie Text Editor %s", VERSION);
+	    if (welcomeLength > g_Configuration.screenCols) 
+	        welcomeLength = g_Configuration.screenCols;
+	    int padding = (g_Configuration.screenCols - (welcomeLength / 2)) / 2;
+	    if (padding) {
+		bufferAppend(bff, COLUMN_SYMBOL, 1);
+		padding--;
+	    }
+	    while (padding--) bufferAppend(bff, " ", 1);
+	    bufferAppend(bff, welcomeMessage, welcomeLength);
+	}
+	else
+	    bufferAppend(bff, COLUMN_SYMBOL, 1);
+	
 	bufferAppend(bff, "\x1b[K", 3);
 	if (y < g_Configuration.screenRows - 1)
 	    bufferAppend(bff, "\r\n", 2);
+	
     }
     return;
 }
