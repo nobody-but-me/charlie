@@ -28,6 +28,12 @@ enum KEYS {
     LEFT        ,
     DOWN        ,
     UP          ,
+    
+    PAGE_DOWN   ,
+    PAGE_UP     ,
+    
+    HOME        ,
+    END         ,
 };
 
 struct editorConfig {
@@ -218,6 +224,23 @@ void keyPress(void) {
 	    write(STDOUT_FILENO, "\x1b[H", 3);
 	    exit(0);
 	    break;
+	
+	case HOME:
+	    g_Configuration.cursorX = 0;
+	    break;
+	case END:
+	    g_Configuration.cursorX = g_Configuration.screenCols - 1;
+	    break;
+	
+	case PAGE_DOWN:
+	case PAGE_UP:
+	    {
+		int times = g_Configuration.screenRows;
+		while (times--)
+		    moveCursor(c == PAGE_UP ? UP : DOWN);
+	    }
+	    break;
+	
 	case RIGHT:
 	case LEFT:
 	case DOWN:
@@ -241,12 +264,34 @@ int readKey(void) {
 	if (read(STDIN_FILENO, &sequence[1], 1) != 1) return '\x1b';
 	
 	if (sequence[0] == '[') {
+	    if (sequence[1] >= '0' && sequence[1] <= '9') {
+		if (read(STDIN_FILENO, &sequence[2], 1) != 1) return '\x1b';
+		if (sequence[2] == '~') {
+		    switch (sequence[1]) {
+		        case '6': return PAGE_DOWN;
+		        case '5': return PAGE_UP;
+			
+		        case '1': return HOME;
+		        case '7': return HOME;
+		        case '4': return END;
+		        case '8': return END;
+		    }
+		}
+	    } else {
+		switch (sequence[1]) {
+		    case 'C': return RIGHT;
+		    case 'D': return LEFT;
+		    case 'B': return DOWN;
+		    case 'A': return UP;
+		    
+		    case 'H': return HOME;
+		    case 'F': return END;
+	        }
+	    }
+	} else if (sequence[0] == '0') {
 	    switch (sequence[1]) {
-		// Arrow keys
-	        case 'C': return RIGHT;
-	        case 'D': return LEFT;
-	        case 'B': return DOWN;
-	        case 'A': return UP;
+	        case 'H': return HOME;
+	        case 'F': return END;
 	    }
 	}
 	return '\x1b';
