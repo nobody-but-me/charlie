@@ -23,10 +23,19 @@
 // |-                   Definition                 -|
 // \------------------------|-----------------------/
 
+enum KEYS {
+    RIGHT = 1000,
+    LEFT        ,
+    DOWN        ,
+    UP          ,
+};
+
 struct editorConfig {
     struct termios m_OriginalTermios;
     unsigned int screenRows;
     unsigned int screenCols;
+    
+    unsigned int cursorX, cursorY;
 };
 
 struct ABUF {
@@ -42,6 +51,7 @@ void bufferAppend(struct ABUF *bff, const char *string, int length);
 void bufferFree(struct ABUF *bff);
 
 int getCursorPosition(unsigned int *rows, unsigned int *cols);
+void moveCursor(int key);
 
 void disableRawMode(void);
 void enableRawMode(void);
@@ -50,7 +60,7 @@ void drawRows(struct ABUF *bff);
 void refreshScreen(void);
 
 void keyPress(void);
-char readKey(void);
+int readKey(void);
 
 void init(void);
 
@@ -113,6 +123,24 @@ int getCursorPosition(unsigned int *rows, unsigned int *cols) {
     return 0;
 }
 
+void moveCursor(int key) {
+    switch(key) {
+        case LEFT:
+	    g_Configuration.cursorX--;
+	    break;
+        case RIGHT:
+	    g_Configuration.cursorX++;
+	    break;
+        case DOWN:
+	    g_Configuration.cursorY++;
+	    break;
+        case UP:
+	    g_Configuration.cursorY--;
+	    break;
+    }
+    return;
+}
+
 void disableRawMode(void) {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &g_Configuration.m_OriginalTermios) == -1)
         error("tcsetattr");
@@ -171,7 +199,10 @@ void refreshScreen(void) {
     
     drawRows(&buffer);
     
-    bufferAppend(&buffer, "\x1b[H", 3);
+    char cursor[32];
+    snprintf(cursor, sizeof(cursor), "\x1b[%d;%dH", g_Configuration.cursorY + 1, g_Configuration.cursorX + 1);
+    bufferAppend(&buffer, cursor, strlen(cursor));
+    
     bufferAppend(&buffer, "\x1b[?25h", 6);
     
     write(STDOUT_FILENO, buffer.buffer, buffer.length);
@@ -180,27 +211,60 @@ void refreshScreen(void) {
 }
 
 void keyPress(void) {
-    char c = readKey();
+    int c = readKey();
     switch (c) {
         case 27:
 	    write(STDOUT_FILENO, "\x1b[2J", 4);
 	    write(STDOUT_FILENO, "\x1b[H", 3);
 	    exit(0);
 	    break;
+	case RIGHT:
+	case LEFT:
+	case DOWN:
+	case UP:
+	    moveCursor(c);
+	    break;
     }
     return;
 }
 
-char readKey(void) {
+int readKey(void) {
     int nread; char c;
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
 	if (nread == -1 && errno != EAGAIN)
 	    error("read");
     }
+    
+    if (c == '\x1b') {
+	char sequence[3];
+	if (read(STDIN_FILENO, &sequence[0], 1) != 1) return '\x1b';
+	if (read(STDIN_FILENO, &sequence[1], 1) != 1) return '\x1b';
+	
+	if (sequence[0] == '[') {
+	    switch (sequence[1]) {
+		// Arrow keys
+	        case 'C': return RIGHT;
+	        case 'D': return LEFT;
+	        case 'B': return DOWN;
+	        case 'A': return UP;
+	    }
+	}
+	return '\x1b';
+    } else {
+	switch (c) {
+	    // Emacs-like
+	    case CTRL_KEY('f'): return RIGHT;
+	    case CTRL_KEY('b'): return LEFT;
+	    case CTRL_KEY('n'): return DOWN;
+	    case CTRL_KEY('p'): return UP;
+	}
+    }
     return c;
 }
 
 void init(void) {
+    g_Configuration.cursorX = 0; g_Configuration.cursorY = 0;
+    
     if (getWindowSize(&g_Configuration.screenRows, &g_Configuration.screenCols) == -1)
         error("getWindowSize");
     return;
