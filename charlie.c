@@ -1,4 +1,4 @@
-// ------------------------------------------------------------------------------------------------------------------------------------------------------
+
 // /------------------------|-----------------------\
 // |-              Macros and Includes             -|
 // \------------------------|-----------------------/
@@ -18,10 +18,11 @@
 #include <stdio.h>
 #include <errno.h>
 
-#define CTRL_KEY(k) ((k) & 0x1f)
 #define COLUMN_SYMBOL "."
 #define VERSION "0.0.1"
+#define TAB_STOP 8
 
+#define CTRL_KEY(k) ((k) & 0x1f)
 #define ABUF_INIT { NULL, 0 }
 
 // /------------------------|-----------------------\
@@ -29,7 +30,9 @@
 // \------------------------|-----------------------/
 
 typedef struct editorRow {
+    char *render;
     char *chars;
+    int rsize;
     int size;
 } ROW;
 
@@ -85,6 +88,7 @@ void keyPress(void);
 int readKey(void);
 
 void appendRow(char *string, size_t length);
+void updateRow(ROW *row);
 
 void editorScroll(void);
 
@@ -226,12 +230,12 @@ void drawRows(struct ABUF *bff) {
 		bufferAppend(bff, COLUMN_SYMBOL, 1);
 	    }
 	} else {
-	    unsigned int length = g_Configuration.rows[fileRow].size - g_Configuration.colsOff;
+	    unsigned int length = g_Configuration.rows[fileRow].rsize - g_Configuration.colsOff;
 	    
 	    if (length < 0) length = 0;
 	    if (length > g_Configuration.screenCols) length = g_Configuration.screenCols;
 	    
-	    bufferAppend(bff, &g_Configuration.rows[fileRow].chars[g_Configuration.colsOff], length);
+	    bufferAppend(bff, &g_Configuration.rows[fileRow].render[g_Configuration.colsOff], length);
 	}
 	bufferAppend(bff, "\x1b[K", 3);
 	if (y < g_Configuration.screenRows - 1) {
@@ -367,7 +371,36 @@ void appendRow(char *string, size_t length) {
     g_Configuration.rows[at].chars = malloc(length + 1);
     memcpy(g_Configuration.rows[at].chars, string, length);
     g_Configuration.rows[at].chars[length] = '\0';
+    
+    g_Configuration.rows[at].render = NULL;
+    g_Configuration.rows[at].rsize = 0;
+    updateRow(&g_Configuration.rows[at]);
+    
     g_Configuration.numberRows++;
+    return;
+}
+void updateRow(ROW *row) {
+    int tabs = 0;
+    
+    for (int i = 0; i < row->size; i++)
+    if (row->chars[i] == '\t')
+        tabs++;
+    free(row->render);
+    
+    row->render = malloc(row->size + tabs * (TAB_STOP - 1) + 1);
+    int index = 0;
+    for (int i = 0; i < row->size; i++) {
+	if (row->chars[i] == '\t') {
+	    row->render[index++] = ' ';
+	    while (index % TAB_STOP != 0)
+	        row->render[index++] = ' ';
+	} else {
+	    row->render[index++] = row->chars[i];
+	}
+    }
+    
+    row->render[index] = '\0';
+    row->rsize = index;
     return;
 }
 
