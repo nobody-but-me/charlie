@@ -19,10 +19,12 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <fcntl.h>
 #include <errno.h>
 
 #define COLUMN_SYMBOL "."
 #define VERSION "0.0.1"
+#define QUIT_TIMES 1
 #define TAB_STOP 8
 
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -69,6 +71,7 @@ struct editorConfig {
     
     time_t statusMessageTime;
     char statusMessage[80];
+    int dirty;
     
     char *filename;
     ROW *rows;
@@ -80,6 +83,7 @@ struct ABUF {
 };
 
 unsigned int rowCxToRx(ROW *row, unsigned int cursorX);
+char *rowsToString(unsigned int *bufferLength);
 
 int getWindowSize(unsigned int *rows, unsigned int *cols);
 
@@ -114,6 +118,8 @@ void updateRow(ROW *row);
 
 void editorScroll(void);
 
+void save(void);
+
 void editorOpen(const char *file_path);
 void init(void);
 
@@ -132,6 +138,22 @@ unsigned int rowCxToRx(ROW *row, unsigned int cursorX) {
 	newRenderX++;
     }
     return newRenderX;
+}
+
+char *rowsToString(unsigned int *bufferLength) {
+    int totalLength = 0;
+    for (unsigned int i = 0; i < g_Configuration.numberRows; i++)
+	totalLength += g_Configuration.rows[i].size + 1;
+    *bufferLength = totalLength;
+    
+    char *buffer = malloc(totalLength);
+    char *pointer = buffer;
+    for (unsigned int i = 0; i < g_Configuration.numberRows; i++) {
+	memcpy(pointer, g_Configuration.rows[i].chars, g_Configuration.rows[i].size);
+	pointer += g_Configuration.rows[i].size; *pointer = '\n';
+	pointer++;
+    }
+    return buffer;
 }
 
 int getWindowSize(unsigned int *rows, unsigned int *cols) {
@@ -265,6 +287,7 @@ void insertChar(int character) {
 	appendRow("", 0);
     rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, character);
     g_Configuration.cursorX++;
+    g_Configuration.dirty++;
     return;
 }
 void deleteChar(void) {
@@ -274,6 +297,7 @@ void deleteChar(void) {
     if (g_Configuration.cursorX > 0) {
 	rowDeleteChar(row, g_Configuration.cursorX - 1);
 	g_Configuration.cursorX--;
+	g_Configuration.dirty++;
     }
     return;
 }
@@ -305,7 +329,7 @@ void drawStatusBar(struct ABUF *bff) {
     bufferAppend(bff, "\x1b[7m", 4);
     char status[80];
     
-    unsigned int length = snprintf(status, sizeof(status), "%.20s [line %u/%u][column %u/%u]", g_Configuration.filename ? g_Configuration.filename : "[New File]", g_Configuration.cursorY, g_Configuration.numberRows, g_Configuration.cursorX, g_Configuration.screenCols);
+    unsigned int length = snprintf(status, sizeof(status), "%.20s %s [line %u/%u][column %u/%u]", g_Configuration.filename ? g_Configuration.filename : "[New File]", g_Configuration.dirty ? "(modified)" : "", g_Configuration.cursorY, g_Configuration.numberRows, g_Configuration.cursorX, g_Configuration.screenCols);
     
     if (length > g_Configuration.screenCols)
 	length = g_Configuration.screenCols;
@@ -375,10 +399,16 @@ void refreshScreen(void) {
 
 void keyPress(void) {
     ROW *row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
+    static int quit_times = QUIT_TIMES;
     int c = readKey();
     switch (c) {
         case '\r': break;
         case 27:
+	    if (g_Configuration.dirty && quit_times > 0) {
+		setStatusMessage("File has unsaved changes! If you're sure, press ESC key %d more times to quit.", quit_times);
+		quit_times--;
+		return;
+	    }
 	    write(STDOUT_FILENO, "\x1b[2J", 4);
 	    write(STDOUT_FILENO, "\x1b[H", 3);
 	    exit(0);
@@ -392,7 +422,11 @@ void keyPress(void) {
 	    row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
 	    unsigned int rowLength = row ? row->size : 0;
 	    if (g_Configuration.cursorX < rowLength) g_Configuration.cursorX = rowLength;
-	    else                                     g_Configuration.cursorX = g_Configuration.screenCols - 1;
+	    break;
+	
+	case CTRL_KEY('x'): break;
+	case CTRL_KEY('s'):
+	    save();
 	    break;
 	
 	case CTRL_KEY('h'):
@@ -432,6 +466,7 @@ void keyPress(void) {
 	    insertChar(c);
 	    break;
     }
+    quit_times = QUIT_TIMES;
     return;
 }
 
@@ -508,6 +543,7 @@ void appendRow(char *string, size_t length) {
     updateRow(&g_Configuration.rows[at]);
     
     g_Configuration.numberRows++;
+    g_Configuration.dirty++;
     return;
 }
 void updateRow(ROW *row) {
@@ -548,6 +584,31 @@ void editorScroll(void) {
     return;
 }
 
+void save(void) {
+    if (g_Configuration.filename == NULL) return; // TODO: create a new file if filename == NULL;
+    unsigned int length;
+    char *buffer = rowsToString(&length);
+    
+    int fd = open(g_Configuration.filename, O_RDWR | O_CREAT, 0644);
+    ftruncate(fd, length);
+    if (fd != -1) {
+	if (ftruncate(fd, length) != -1) {
+	    if (write(fd, buffer, length) == length) {
+		close(fd);
+		free(buffer);
+		
+		setStatusMessage("%s file saved! [%d bytes written to disk]", g_Configuration.filename, length);
+		g_Configuration.dirty = 0;
+		return;
+	    }
+	}
+	close(fd);
+    }
+    setStatusMessage("Can't save :: Input/Output error: %s", strerror(errno));
+    free(buffer);
+    return;
+}
+
 void editorOpen(const char *file_path) {
     free(g_Configuration.filename); g_Configuration.filename = strdup(file_path);
     FILE *file = fopen(file_path, "r");
@@ -563,6 +624,8 @@ void editorOpen(const char *file_path) {
 	    length--;
 	appendRow(line, length);
     }
+    
+    g_Configuration.dirty = 0;
     free(line);
     fclose(file);
     return;
@@ -579,6 +642,7 @@ void init(void) {
     
     g_Configuration.statusMessage[0] = '\0';
     g_Configuration.statusMessageTime = 0;
+    g_Configuration.dirty = 0;
 
     g_Configuration.filename = NULL;
     
@@ -591,7 +655,7 @@ void init(void) {
 int main(void) {
     enableRawMode();
     
-    init(); editorOpen("../../charlie.c");
+    init(); editorOpen("../../test.c");
     
     setStatusMessage("Hello from Charlie!");
     while (1) {
