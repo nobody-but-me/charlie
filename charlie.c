@@ -55,6 +55,7 @@ struct editorConfig {
     unsigned int screenCols;
     
     unsigned int cursorX, cursorY;
+    unsigned int renderX;
     
     unsigned int rowsOff;
     unsigned int colsOff;
@@ -67,6 +68,8 @@ struct ABUF {
     char *buffer;
     int length;
 };
+
+unsigned int rowCxToRx(ROW *row, unsigned int cursorX);
 
 int getWindowSize(unsigned int *rows, unsigned int *cols);
 
@@ -102,6 +105,15 @@ void init(void);
 
 struct editorConfig g_Configuration;
 
+unsigned int rowCxToRx(ROW *row, unsigned int cursorX) {
+    unsigned int newRenderX = 0;
+    for (unsigned int i = 0; i < cursorX; i++) {
+	if (row->chars[i] == '\t')
+	newRenderX += (TAB_STOP - 1) - (newRenderX % TAB_STOP);
+	newRenderX++;
+    }
+    return newRenderX;
+}
 
 int getWindowSize(unsigned int *rows, unsigned int *cols) {
     struct winsize window_size;
@@ -255,7 +267,7 @@ void refreshScreen(void) {
     drawRows(&buffer);
     
     char cursor[32];
-    snprintf(cursor, sizeof(cursor), "\x1b[%d;%dH", (g_Configuration.cursorY - g_Configuration.rowsOff) + 1, (g_Configuration.cursorX - g_Configuration.colsOff) + 1);
+    snprintf(cursor, sizeof(cursor), "\x1b[%d;%dH", (g_Configuration.cursorY - g_Configuration.rowsOff) + 1, (g_Configuration.renderX - g_Configuration.colsOff) + 1);
     bufferAppend(&buffer, cursor, strlen(cursor));
     
     bufferAppend(&buffer, "\x1b[?25h", 6);
@@ -405,11 +417,15 @@ void updateRow(ROW *row) {
 }
 
 void editorScroll(void) {
+    g_Configuration.renderX = 0;
+    if (g_Configuration.cursorY < g_Configuration.numberRows)
+	g_Configuration.renderX = rowCxToRx(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX);
+    
     if (g_Configuration.cursorY < g_Configuration.rowsOff) g_Configuration.rowsOff = g_Configuration.cursorY;
     if (g_Configuration.cursorY >= g_Configuration.rowsOff + g_Configuration.screenRows) g_Configuration.rowsOff = g_Configuration.cursorY - g_Configuration.screenRows + 1;
     
-    if (g_Configuration.cursorX < g_Configuration.colsOff) g_Configuration.colsOff = g_Configuration.cursorX;
-    if (g_Configuration.cursorX >= g_Configuration.colsOff + g_Configuration.screenCols) g_Configuration.colsOff = g_Configuration.cursorX - g_Configuration.screenCols + 1;
+    if (g_Configuration.renderX < g_Configuration.colsOff) g_Configuration.colsOff = g_Configuration.renderX;
+    if (g_Configuration.renderX >= g_Configuration.colsOff + g_Configuration.screenCols) g_Configuration.colsOff = g_Configuration.renderX - g_Configuration.screenCols + 1;
     return;
 }
 
@@ -433,6 +449,7 @@ void editorOpen(const char *file_path) {
 }
 void init(void) {
     g_Configuration.cursorX = 0; g_Configuration.cursorY = 0;
+    g_Configuration.renderX = 0;
     
     g_Configuration.rowsOff = 0;
     g_Configuration.colsOff = 0;
