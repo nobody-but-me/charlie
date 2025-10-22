@@ -156,9 +156,17 @@ void moveCursor(int key) {
     switch(key) {
         case LEFT:
 	    if (g_Configuration.cursorX != 0) g_Configuration.cursorX--;
+	    else if (g_Configuration.cursorY > 0) {
+		g_Configuration.cursorY--;
+		g_Configuration.cursorX = g_Configuration.rows[g_Configuration.cursorY].size;
+	    }
 	    break;
         case RIGHT:
 	    if (row && g_Configuration.cursorX < (unsigned int)row->size) g_Configuration.cursorX++;
+	    else if (g_Configuration.cursorY > 0) {
+		g_Configuration.cursorY++;
+		g_Configuration.cursorX = 0;
+	    }
 	    break;
         case DOWN:
 	    if (g_Configuration.cursorY < g_Configuration.numberRows) g_Configuration.cursorY++;
@@ -253,6 +261,7 @@ void refreshScreen(void) {
 }
 
 void keyPress(void) {
+    ROW *row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
     int c = readKey();
     switch (c) {
         case 27:
@@ -265,7 +274,11 @@ void keyPress(void) {
 	    g_Configuration.cursorX = 0;
 	    break;
 	case END:
-	    g_Configuration.cursorX = g_Configuration.screenCols - 1;
+	    // g_Configuration.cursorX = g_Configuration.screenCols - 1;
+	    row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
+	    unsigned int rowLength = row ? row->size : 0;
+	    if (g_Configuration.cursorX < rowLength) g_Configuration.cursorX = rowLength;
+	    else                                     g_Configuration.cursorX = g_Configuration.screenCols - 1;
 	    break;
 	
 	case PAGE_DOWN:
