@@ -1,12 +1,17 @@
-
+//
 // /------------------------|-----------------------\
 // |-              Macros and Includes             -|
 // \------------------------|-----------------------/
+
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
 
 #include <termios.h>
 #include <ctype.h>
 
 #include <sys/ioctl.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,6 +27,11 @@
 // /------------------------|-----------------------\
 // |-                   Definition                 -|
 // \------------------------|-----------------------/
+
+typedef struct editorRow {
+    char *chars;
+    int size;
+} ROW;
 
 enum KEYS {
     RIGHT = 1000,
@@ -42,6 +52,9 @@ struct editorConfig {
     unsigned int screenCols;
     
     unsigned int cursorX, cursorY;
+    
+    unsigned int numberRows;
+    ROW *rows;
 };
 
 struct ABUF {
@@ -68,6 +81,9 @@ void refreshScreen(void);
 void keyPress(void);
 int readKey(void);
 
+void appendRow(char *string, size_t length);
+
+void editorOpen(const char *file_path);
 void init(void);
 
 // /------------------------|-----------------------\
@@ -174,26 +190,33 @@ void enableRawMode(void) {
 
 void drawRows(struct ABUF *bff) {
     for (unsigned int y = 0; y < g_Configuration.screenRows; y++) {
-	if (y == g_Configuration.screenRows / 2) {
-	    char welcomeMessage[80];
-	    unsigned int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie Text Editor %s", VERSION);
-	    if (welcomeLength > g_Configuration.screenCols) 
-	        welcomeLength = g_Configuration.screenCols;
-	    int padding = (g_Configuration.screenCols - (welcomeLength / 2)) / 2;
-	    if (padding) {
+	if (y >= g_Configuration.numberRows) {
+	    if (g_Configuration.numberRows == 0 && y == g_Configuration.screenRows / 2) {
+		char welcomeMessage[80];
+		
+		unsigned int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie Text Editor %s", VERSION);
+		if (welcomeLength > g_Configuration.screenCols) welcomeLength = g_Configuration.screenCols;
+		
+		int padding = (g_Configuration.screenCols - welcomeLength) / 2;
+		if (padding) {
+		    bufferAppend(bff, COLUMN_SYMBOL, 1);
+		    padding--;
+		}
+		while (padding--) bufferAppend(bff, " ", 1);
+		bufferAppend(bff, welcomeMessage, welcomeLength);
+	    } else
 		bufferAppend(bff, COLUMN_SYMBOL, 1);
-		padding--;
-	    }
-	    while (padding--) bufferAppend(bff, " ", 1);
-	    bufferAppend(bff, welcomeMessage, welcomeLength);
 	}
-	else
-	    bufferAppend(bff, COLUMN_SYMBOL, 1);
+	else {
+	    unsigned int length = g_Configuration.rows[y].size;
+	    if (length > g_Configuration.screenCols) length = g_Configuration.screenCols;
+	    bufferAppend(bff, g_Configuration.rows[y].chars, length);
+	}
 	
 	bufferAppend(bff, "\x1b[K", 3);
-	if (y < g_Configuration.screenRows - 1)
+	if (y < g_Configuration.screenRows - 1) {
 	    bufferAppend(bff, "\r\n", 2);
-	
+	}
     }
     return;
 }
@@ -307,8 +330,40 @@ int readKey(void) {
     return c;
 }
 
+void appendRow(char *string, size_t length) {
+    g_Configuration.rows = realloc(g_Configuration.rows, sizeof(ROW) * (g_Configuration.numberRows + 1));
+    int at = g_Configuration.numberRows;
+    
+    g_Configuration.rows[at].size = length;
+    g_Configuration.rows[at].chars = malloc(length + 1);
+    memcpy(g_Configuration.rows[at].chars, string, length);
+    g_Configuration.rows[at].chars[length] = '\0';
+    g_Configuration.numberRows++;
+    return;
+}
+
+void editorOpen(const char *file_path) {
+    FILE *file = fopen(file_path, "r");
+    if (!file)
+        error("fopen");
+    
+    size_t capacity = 0;
+    char *line = NULL;
+    ssize_t length;
+    
+    while ((length = getline(&line, &capacity, file)) != -1) {
+	while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r'))
+	    length--;
+	appendRow(line, length);
+    }
+    free(line);
+    fclose(file);
+    return;
+}
 void init(void) {
     g_Configuration.cursorX = 0; g_Configuration.cursorY = 0;
+    g_Configuration.numberRows = 0;
+    g_Configuration.rows = NULL;
     
     if (getWindowSize(&g_Configuration.screenRows, &g_Configuration.screenCols) == -1)
         error("getWindowSize");
@@ -317,8 +372,8 @@ void init(void) {
 
 int main(void) {
     enableRawMode();
-    init();
     
+    init(); editorOpen("../../charlie.c");
     while (1) {
 	refreshScreen();
 	keyPress();
