@@ -1,4 +1,4 @@
-//
+// ------------------------------------------------------------------------------------------------------------------------------------------------------
 // /------------------------|-----------------------\
 // |-              Macros and Includes             -|
 // \------------------------|-----------------------/
@@ -53,6 +53,9 @@ struct editorConfig {
     
     unsigned int cursorX, cursorY;
     
+    unsigned int rowsOff;
+    unsigned int colsOff;
+    
     unsigned int numberRows;
     ROW *rows;
 };
@@ -82,6 +85,8 @@ void keyPress(void);
 int readKey(void);
 
 void appendRow(char *string, size_t length);
+
+void editorScroll(void);
 
 void editorOpen(const char *file_path);
 void init(void);
@@ -146,20 +151,25 @@ int getCursorPosition(unsigned int *rows, unsigned int *cols) {
 }
 
 void moveCursor(int key) {
+    ROW *row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
+    
     switch(key) {
         case LEFT:
-	    g_Configuration.cursorX--;
+	    if (g_Configuration.cursorX != 0) g_Configuration.cursorX--;
 	    break;
         case RIGHT:
-	    g_Configuration.cursorX++;
+	    if (row && g_Configuration.cursorX < (unsigned int)row->size) g_Configuration.cursorX++;
 	    break;
         case DOWN:
-	    g_Configuration.cursorY++;
+	    if (g_Configuration.cursorY < g_Configuration.numberRows) g_Configuration.cursorY++;
 	    break;
         case UP:
-	    g_Configuration.cursorY--;
+	    if (g_Configuration.cursorY != 0) g_Configuration.cursorY--;
 	    break;
     }
+    row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
+    unsigned int rowLength = row ? row->size : 0;
+    if (g_Configuration.cursorX > rowLength) g_Configuration.cursorX = rowLength;
     return;
 }
 
@@ -190,10 +200,10 @@ void enableRawMode(void) {
 
 void drawRows(struct ABUF *bff) {
     for (unsigned int y = 0; y < g_Configuration.screenRows; y++) {
-	if (y >= g_Configuration.numberRows) {
+	unsigned int fileRow = y + g_Configuration.rowsOff;
+	if (fileRow >= g_Configuration.numberRows) {
 	    if (g_Configuration.numberRows == 0 && y == g_Configuration.screenRows / 2) {
 		char welcomeMessage[80];
-		
 		unsigned int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie Text Editor %s", VERSION);
 		if (welcomeLength > g_Configuration.screenCols) welcomeLength = g_Configuration.screenCols;
 		
@@ -204,23 +214,27 @@ void drawRows(struct ABUF *bff) {
 		}
 		while (padding--) bufferAppend(bff, " ", 1);
 		bufferAppend(bff, welcomeMessage, welcomeLength);
-	    } else
+	    } else {
 		bufferAppend(bff, COLUMN_SYMBOL, 1);
-	}
-	else {
-	    unsigned int length = g_Configuration.rows[y].size;
+	    }
+	} else {
+	    unsigned int length = g_Configuration.rows[fileRow].size - g_Configuration.colsOff;
+	    
+	    if (length < 0) length = 0;
 	    if (length > g_Configuration.screenCols) length = g_Configuration.screenCols;
-	    bufferAppend(bff, g_Configuration.rows[y].chars, length);
+	    
+	    bufferAppend(bff, &g_Configuration.rows[fileRow].chars[g_Configuration.colsOff], length);
 	}
-	
 	bufferAppend(bff, "\x1b[K", 3);
 	if (y < g_Configuration.screenRows - 1) {
 	    bufferAppend(bff, "\r\n", 2);
 	}
     }
-    return;
 }
+
 void refreshScreen(void) {
+    editorScroll();
+    
     struct ABUF buffer = ABUF_INIT;
     
     bufferAppend(&buffer, "\x1b[?25l", 6);
@@ -229,11 +243,10 @@ void refreshScreen(void) {
     drawRows(&buffer);
     
     char cursor[32];
-    snprintf(cursor, sizeof(cursor), "\x1b[%d;%dH", g_Configuration.cursorY + 1, g_Configuration.cursorX + 1);
+    snprintf(cursor, sizeof(cursor), "\x1b[%d;%dH", (g_Configuration.cursorY - g_Configuration.rowsOff) + 1, (g_Configuration.cursorX - g_Configuration.colsOff) + 1);
     bufferAppend(&buffer, cursor, strlen(cursor));
     
     bufferAppend(&buffer, "\x1b[?25h", 6);
-    
     write(STDOUT_FILENO, buffer.buffer, buffer.length);
     bufferFree(&buffer);
     return;
@@ -325,6 +338,9 @@ int readKey(void) {
 	    case CTRL_KEY('b'): return LEFT;
 	    case CTRL_KEY('n'): return DOWN;
 	    case CTRL_KEY('p'): return UP;
+	    
+	    case CTRL_KEY('a'): return HOME;
+	    case CTRL_KEY('e'): return END;
 	}
     }
     return c;
@@ -339,6 +355,15 @@ void appendRow(char *string, size_t length) {
     memcpy(g_Configuration.rows[at].chars, string, length);
     g_Configuration.rows[at].chars[length] = '\0';
     g_Configuration.numberRows++;
+    return;
+}
+
+void editorScroll(void) {
+    if (g_Configuration.cursorY < g_Configuration.rowsOff) g_Configuration.rowsOff = g_Configuration.cursorY;
+    if (g_Configuration.cursorY >= g_Configuration.rowsOff + g_Configuration.screenRows) g_Configuration.rowsOff = g_Configuration.cursorY - g_Configuration.screenRows + 1;
+    
+    if (g_Configuration.cursorX < g_Configuration.colsOff) g_Configuration.colsOff = g_Configuration.cursorX;
+    if (g_Configuration.cursorX >= g_Configuration.colsOff + g_Configuration.screenCols) g_Configuration.colsOff = g_Configuration.cursorX - g_Configuration.screenCols + 1;
     return;
 }
 
@@ -362,6 +387,10 @@ void editorOpen(const char *file_path) {
 }
 void init(void) {
     g_Configuration.cursorX = 0; g_Configuration.cursorY = 0;
+    
+    g_Configuration.rowsOff = 0;
+    g_Configuration.colsOff = 0;
+    
     g_Configuration.numberRows = 0;
     g_Configuration.rows = NULL;
     
