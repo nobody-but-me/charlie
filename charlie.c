@@ -9,12 +9,15 @@
 
 #include <termios.h>
 #include <ctype.h>
+#include <time.h>
 
 #include <sys/ioctl.h>
 #include <sys/types.h>
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <errno.h>
 
@@ -61,6 +64,11 @@ struct editorConfig {
     unsigned int colsOff;
     
     unsigned int numberRows;
+    
+    time_t statusMessageTime;
+    char statusMessage[80];
+    
+    char *filename;
     ROW *rows;
 };
 
@@ -84,6 +92,10 @@ void moveCursor(int key);
 void disableRawMode(void);
 void enableRawMode(void);
 
+void setStatusMessage(const char *formated_string, ...);
+void drawStatusMessage(struct ABUF *bff);
+
+void drawStatusBar(struct ABUF *bff);
 void drawRows(struct ABUF *bff);
 void refreshScreen(void);
 
@@ -222,6 +234,47 @@ void enableRawMode(void) {
     return;
 }
 
+void setStatusMessage(const char *formated_string, ...) {
+    va_list parameters;
+    va_start(parameters, formated_string);
+    vsnprintf(g_Configuration.statusMessage, sizeof(g_Configuration.statusMessage), formated_string, parameters);
+    va_end(parameters);
+    g_Configuration.statusMessageTime = time(NULL);
+    return;
+}
+void drawStatusMessage(struct ABUF *bff) {
+    bufferAppend(bff, "\x1b[7m", 4);
+    unsigned length = strlen(g_Configuration.statusMessage);
+    if (length > g_Configuration.screenCols) length = g_Configuration.screenCols;
+    if (length && time(NULL) - g_Configuration.statusMessageTime < 5) {
+	bufferAppend(bff, g_Configuration.statusMessage, length);
+    }
+    
+    while (length < g_Configuration.screenCols) {
+	bufferAppend(bff, " ", 1); length++;
+    }
+    
+    bufferAppend(bff, "\x1b[m", 3);
+}
+
+void drawStatusBar(struct ABUF *bff) {
+    bufferAppend(bff, "\x1b[7m", 4);
+    char status[80];
+    
+    unsigned int length = snprintf(status, sizeof(status), "%.20s [line %u/%u][column %u/%u]", g_Configuration.filename ? g_Configuration.filename : "[New File]", g_Configuration.cursorY, g_Configuration.numberRows, g_Configuration.cursorX, g_Configuration.screenCols);
+    
+    if (length > g_Configuration.screenCols)
+	length = g_Configuration.screenCols;
+    bufferAppend(bff, status, length);
+    
+    while (length < g_Configuration.screenCols) {
+	bufferAppend(bff, " ", 1); length++;
+    }
+    bufferAppend(bff, "\r\n", 2);
+    bufferAppend(bff, "\x1b[m", 3);
+    return;
+}
+
 void drawRows(struct ABUF *bff) {
     for (unsigned int y = 0; y < g_Configuration.screenRows; y++) {
 	unsigned int fileRow = y + g_Configuration.rowsOff;
@@ -250,9 +303,7 @@ void drawRows(struct ABUF *bff) {
 	    bufferAppend(bff, &g_Configuration.rows[fileRow].render[g_Configuration.colsOff], length);
 	}
 	bufferAppend(bff, "\x1b[K", 3);
-	if (y < g_Configuration.screenRows - 1) {
-	    bufferAppend(bff, "\r\n", 2);
-	}
+	bufferAppend(bff, "\r\n", 2);
     }
 }
 
@@ -265,6 +316,8 @@ void refreshScreen(void) {
     bufferAppend(&buffer, "\x1b[H", 3);
     
     drawRows(&buffer);
+    drawStatusBar(&buffer);
+    drawStatusMessage(&buffer);
     
     char cursor[32];
     snprintf(cursor, sizeof(cursor), "\x1b[%d;%dH", (g_Configuration.cursorY - g_Configuration.rowsOff) + 1, (g_Configuration.renderX - g_Configuration.colsOff) + 1);
@@ -300,6 +353,15 @@ void keyPress(void) {
 	case PAGE_DOWN:
 	case PAGE_UP:
 	    {
+		if (c == PAGE_DOWN) {
+		    g_Configuration.cursorY = g_Configuration.rowsOff + g_Configuration.screenRows -  1;
+		    if (g_Configuration.cursorY > g_Configuration.numberRows)
+		        g_Configuration.cursorY = g_Configuration.numberRows;
+		}
+		else if (c == PAGE_UP) {
+		    g_Configuration.cursorY = g_Configuration.rowsOff;
+		}
+		
 		int times = g_Configuration.screenRows;
 		while (times--)
 		    moveCursor(c == PAGE_UP ? UP : DOWN);
@@ -430,6 +492,7 @@ void editorScroll(void) {
 }
 
 void editorOpen(const char *file_path) {
+    free(g_Configuration.filename); g_Configuration.filename = strdup(file_path);
     FILE *file = fopen(file_path, "r");
     if (!file)
         error("fopen");
@@ -457,8 +520,14 @@ void init(void) {
     g_Configuration.numberRows = 0;
     g_Configuration.rows = NULL;
     
+    g_Configuration.statusMessage[0] = '\0';
+    g_Configuration.statusMessageTime = 0;
+
+    g_Configuration.filename = NULL;
+    
     if (getWindowSize(&g_Configuration.screenRows, &g_Configuration.screenCols) == -1)
         error("getWindowSize");
+    g_Configuration.screenRows -= 2;
     return;
 }
 
@@ -466,6 +535,8 @@ int main(void) {
     enableRawMode();
     
     init(); editorOpen("../../charlie.c");
+    
+    setStatusMessage("Hello from Charlie!");
     while (1) {
 	refreshScreen();
 	keyPress();
