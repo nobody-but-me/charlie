@@ -40,6 +40,8 @@ typedef struct editorRow {
 } ROW;
 
 enum KEYS {
+    BACKSPACE = 127,
+    
     RIGHT = 1000,
     LEFT        ,
     DOWN        ,
@@ -91,6 +93,11 @@ void moveCursor(int key);
 
 void disableRawMode(void);
 void enableRawMode(void);
+
+void rowInsertChar(ROW *row, int at, int character);
+void rowDeleteChar(ROW *row, int at);
+void insertChar(int character);
+void deleteChar(void);
 
 void setStatusMessage(const char *formated_string, ...);
 void drawStatusMessage(struct ABUF *bff);
@@ -234,6 +241,43 @@ void enableRawMode(void) {
     return;
 }
 
+void rowInsertChar(ROW *row, int at, int character) {
+    if (at < 0 || at > row->size) at = row->size;
+    row->chars = realloc(row->chars, row->size + 2);
+    
+    memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1);
+    row->size++;
+    
+    row->chars[at] = character;
+    updateRow(row);
+    return;
+}
+void rowDeleteChar(ROW *row, int at) {
+    if (at < 0 || at >= row->size) return;
+    memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
+    row->size--;
+    
+    updateRow(row);
+}
+
+void insertChar(int character) {
+    if (g_Configuration.cursorY == g_Configuration.numberRows)
+	appendRow("", 0);
+    rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, character);
+    g_Configuration.cursorX++;
+    return;
+}
+void deleteChar(void) {
+    if (g_Configuration.cursorY == g_Configuration.numberRows)
+	return;
+    ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
+    if (g_Configuration.cursorX > 0) {
+	rowDeleteChar(row, g_Configuration.cursorX - 1);
+	g_Configuration.cursorX--;
+    }
+    return;
+}
+
 void setStatusMessage(const char *formated_string, ...) {
     va_list parameters;
     va_start(parameters, formated_string);
@@ -333,6 +377,7 @@ void keyPress(void) {
     ROW *row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
     int c = readKey();
     switch (c) {
+        case '\r': break;
         case 27:
 	    write(STDOUT_FILENO, "\x1b[2J", 4);
 	    write(STDOUT_FILENO, "\x1b[H", 3);
@@ -348,6 +393,11 @@ void keyPress(void) {
 	    unsigned int rowLength = row ? row->size : 0;
 	    if (g_Configuration.cursorX < rowLength) g_Configuration.cursorX = rowLength;
 	    else                                     g_Configuration.cursorX = g_Configuration.screenCols - 1;
+	    break;
+	
+	case CTRL_KEY('h'):
+	case BACKSPACE:
+	    deleteChar();
 	    break;
 	
 	case PAGE_DOWN:
@@ -373,6 +423,13 @@ void keyPress(void) {
 	case DOWN:
 	case UP:
 	    moveCursor(c);
+	    break;
+	
+	case CTRL_KEY('l'):
+	    break;
+	
+	default:
+	    insertChar(c);
 	    break;
     }
     return;
