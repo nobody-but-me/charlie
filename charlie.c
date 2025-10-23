@@ -504,7 +504,10 @@ void find(void) {
 
 void file_open(void) {
 	char *file_path = prompt("Open file at: %s", NULL);
-	if (file_path == NULL) setStatusMessage("Opening file operation aborted.");
+	if (file_path == NULL) {
+		setStatusMessage("Opening file operation aborted.");
+		return;
+	}
 	init(); editorOpen(file_path);
 	refreshScreen();
 	return;
