@@ -25,7 +25,7 @@
 #define COLUMN_SYMBOL "."
 #define VERSION "0.0.1"
 #define QUIT_TIMES 1
-#define TAB_STOP 8
+#define TAB_STOP 4
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define ABUF_INIT { NULL, 0 }
@@ -52,6 +52,7 @@ enum KEYS {
     PAGE_DOWN   ,
     PAGE_UP     ,
     
+    DELETE      ,
     HOME        ,
     END         ,
 };
@@ -83,6 +84,7 @@ struct ABUF {
 };
 
 unsigned int rowCxToRx(ROW *row, unsigned int cursorX);
+unsigned int rowRxToCx(ROW *row, unsigned int renderX);
 char *rowsToString(unsigned int *bufferLength);
 
 int getWindowSize(unsigned int *rows, unsigned int *cols);
@@ -113,7 +115,9 @@ void freeRow(ROW *row);
 void setStatusMessage(const char *formated_string, ...);
 void drawStatusMessage(struct ABUF *bff);
 
-char *prompt(char *prompt); // TODO: change the place of this function. Define and implement it before or after save(void) function.
+char *prompt(char *prompt, void (*callback)(char *, int));
+void find(void);
+
 
 void drawStatusBar(struct ABUF *bff);
 void drawRows(struct ABUF *bff);
@@ -147,6 +151,19 @@ unsigned int rowCxToRx(ROW *row, unsigned int cursorX) {
 	newRenderX++;
     }
     return newRenderX;
+}
+unsigned int rowRxToCx(ROW *row, unsigned int renderX) {
+    unsigned int cursorRenderX = 0;
+    int newCursorX;
+    
+    for (newCursorX = 0; newCursorX < row->size; newCursorX++) {
+	if (row->chars[newCursorX] == '\t') {
+	    cursorRenderX += (TAB_STOP - 1) - (cursorRenderX & TAB_STOP);
+	    cursorRenderX++;
+	    if (cursorRenderX > renderX) return newCursorX;
+	}
+    }
+    return newCursorX;
 }
 
 char *rowsToString(unsigned int *bufferLength) {
@@ -333,13 +350,13 @@ void deleteChar(void) {
     
     ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
     if (g_Configuration.cursorX > 0) {
-	rowDeleteChar(row, g_Configuration.cursorX - 1);
-	g_Configuration.cursorX--;
+		rowDeleteChar(row, g_Configuration.cursorX - 1);
+		g_Configuration.cursorX--;
     } else {
-	g_Configuration.cursorX = g_Configuration.rows[g_Configuration.cursorY - 1].size;
-	rowAppendString(&g_Configuration.rows[g_Configuration.cursorY - 1], row->chars, row->size);
-	deleteRow(g_Configuration.cursorY);
-	g_Configuration.cursorY--;
+		g_Configuration.cursorX = g_Configuration.rows[g_Configuration.cursorY - 1].size;
+		rowAppendString(&g_Configuration.rows[g_Configuration.cursorY - 1], row->chars, row->size);
+		deleteRow(g_Configuration.cursorY);
+		g_Configuration.cursorY--;
     }
     return;
 }
@@ -382,7 +399,7 @@ void drawStatusMessage(struct ABUF *bff) {
     bufferAppend(bff, "\x1b[m", 3);
 }
 
-char *prompt(char *prompt) {
+char *prompt(char *prompt, void (*callback)(char *, int)) {
     size_t buffer_size = 128;
     char *buffer = malloc(buffer_size);
     
@@ -399,11 +416,15 @@ char *prompt(char *prompt) {
 		buffer[--buffer_length] = '\0';
 	} else if (c == '\x1b') {
 	    setStatusMessage("");
+	    if (callback)
+		callback(buffer, c);
 	    free(buffer);
 	    return NULL;
 	} else if (c == '\r') {
 	    if (buffer_length != 0) {
 		setStatusMessage("");
+		if (callback)
+		     callback(buffer, c);
 		return buffer;
 	    }
 	} else if (!iscntrl(c) && c < 128) {
@@ -414,7 +435,70 @@ char *prompt(char *prompt) {
 	    buffer[buffer_length++] = c;
 	    buffer[buffer_length] = '\0';
 	}
+	if (callback)
+	    callback(buffer, c);
     }
+}
+
+void findCallback(char *query, int key) {
+    static int last_match = -1;
+    static int direction = 1;
+
+    if (key == '\r' || key == '\x1b') {
+	last_match = -1;
+	direction = 1;
+	return;
+    }
+    else if (key == DOWN) {
+	direction = 1;
+    }
+    else if (key == UP) {
+	direction = -1;
+    }
+    else {
+	last_match = -1;
+	direction = 1;
+    }
+    
+    if (last_match == -1) direction = 1;
+    int current = last_match;
+    
+    for (unsigned int i = 0; i < g_Configuration.numberRows; i++) {
+        current += direction;
+	if (current == -1)
+	    current = g_Configuration.numberRows - 1;
+	else if (current == (int)g_Configuration.numberRows)
+	    current = 0;
+	
+	ROW *row = &g_Configuration.rows[current];
+	char *match = strstr(row->render, query);
+	if (match) {
+	    last_match = current;
+	    g_Configuration.cursorY = current;
+	    g_Configuration.cursorX = rowRxToCx(row, match - row->render);
+	    
+	    g_Configuration.rowsOff = g_Configuration.numberRows;
+	    break;
+	}
+    }
+}
+
+void find(void) {
+    unsigned int savedColsOff = g_Configuration.colsOff;
+    unsigned int savedRowsOff = g_Configuration.rowsOff;
+    unsigned int savedCursorX = g_Configuration.cursorX;
+    unsigned int savedCursorY = g_Configuration.cursorY;
+    
+    char *query = prompt("Search for: %s", findCallback);
+    if (query)
+	free(query);
+    else {
+	g_Configuration.colsOff = savedColsOff;
+	g_Configuration.rowsOff = savedRowsOff;
+	g_Configuration.cursorX = savedCursorX;
+	g_Configuration.cursorY = savedCursorY;
+    }
+    return;
 }
 
 void drawStatusBar(struct ABUF *bff) {
@@ -518,12 +602,30 @@ void keyPress(void) {
 	    if (g_Configuration.cursorX < rowLength) g_Configuration.cursorX = rowLength;
 	    break;
 	
-	case CTRL_KEY('x'): break;
-	case CTRL_KEY('s'):
+	case CTRL_KEY('x'):
 	    save();
 	    break;
+
+	case CTRL_KEY('s'):
+	    find();
+	    break;
+
+	case DELETE:
+		if (g_Configuration.cursorY != 0) {
+			if (g_Configuration.cursorX != 0) rowDeleteChar(row, g_Configuration.cursorX);
+			else {
+				if (g_Configuration.rows[g_Configuration.cursorY].size > 0) rowDeleteChar(row, g_Configuration.cursorX);
+				else                                                        deleteRow(g_Configuration.cursorY);
+			}
+		} else {
+			if (g_Configuration.cursorX != 0) deleteRow(g_Configuration.cursorY + 1);
+			else {
+				deleteRow(g_Configuration.cursorY);
+				g_Configuration.cursorX = 0;
+			}
+		}
+		break;
 	
-	case CTRL_KEY('h'):
 	case BACKSPACE:
 	    deleteChar();
 	    break;
@@ -588,6 +690,8 @@ int readKey(void) {
 		        case '7': return HOME;
 		        case '4': return END;
 		        case '8': return END;
+			
+			case '3': return DELETE;
 		    }
 		}
 	    } else {
@@ -681,7 +785,7 @@ void editorScroll(void) {
 
 void save(void) {
     if (g_Configuration.filename == NULL) {
-	g_Configuration.filename = prompt("Save new file as: %s");
+	g_Configuration.filename = prompt("Save new file as: %s", NULL);
 	if (g_Configuration.filename == NULL) {
 	    setStatusMessage("Saving process aborted.");
 	    return;

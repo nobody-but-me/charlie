@@ -5,9 +5,7 @@
 if [ -f ./build/bin/charlie ]; then
     echo "[INFO]: RUNNING...\n"
     
-    cd ./build/bin/
-    
-    ./charlie
+    ./build/bin/charlie $1
     
     cd ..
 else
