@@ -27,6 +27,7 @@
 #define QUIT_TIMES 1
 #define TAB_STOP 4
 
+
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define ABUF_INIT { NULL, 0 }
 
@@ -116,8 +117,8 @@ void setStatusMessage(const char *formated_string, ...);
 void drawStatusMessage(struct ABUF *bff);
 
 char *prompt(char *prompt, void (*callback)(char *, int));
+void file_open(void);
 void find(void);
-
 
 void drawStatusBar(struct ABUF *bff);
 void drawRows(struct ABUF *bff);
@@ -146,9 +147,9 @@ struct editorConfig g_Configuration;
 unsigned int rowCxToRx(ROW *row, unsigned int cursorX) {
     unsigned int newRenderX = 0;
     for (unsigned int i = 0; i < cursorX; i++) {
-	if (row->chars[i] == '\t')
-	newRenderX += (TAB_STOP - 1) - (newRenderX % TAB_STOP);
-	newRenderX++;
+		if (row->chars[i] == '\t')
+			newRenderX += (TAB_STOP - 1) - (newRenderX % TAB_STOP);
+		newRenderX++;
     }
     return newRenderX;
 }
@@ -157,11 +158,11 @@ unsigned int rowRxToCx(ROW *row, unsigned int renderX) {
     int newCursorX;
     
     for (newCursorX = 0; newCursorX < row->size; newCursorX++) {
-	if (row->chars[newCursorX] == '\t') {
-	    cursorRenderX += (TAB_STOP - 1) - (cursorRenderX & TAB_STOP);
-	    cursorRenderX++;
-	    if (cursorRenderX > renderX) return newCursorX;
-	}
+		if (row->chars[newCursorX] == '\t') {
+	    	cursorRenderX += (TAB_STOP - 1) - (cursorRenderX & TAB_STOP);
+	    	cursorRenderX++;
+	    	if (cursorRenderX > renderX) return newCursorX;
+		}
     }
     return newCursorX;
 }
@@ -169,15 +170,15 @@ unsigned int rowRxToCx(ROW *row, unsigned int renderX) {
 char *rowsToString(unsigned int *bufferLength) {
     int totalLength = 0;
     for (unsigned int i = 0; i < g_Configuration.numberRows; i++)
-	totalLength += g_Configuration.rows[i].size + 1;
+		totalLength += g_Configuration.rows[i].size + 1;
     *bufferLength = totalLength;
     
     char *buffer = malloc(totalLength);
     char *pointer = buffer;
     for (unsigned int i = 0; i < g_Configuration.numberRows; i++) {
-	memcpy(pointer, g_Configuration.rows[i].chars, g_Configuration.rows[i].size);
-	pointer += g_Configuration.rows[i].size; *pointer = '\n';
-	pointer++;
+		memcpy(pointer, g_Configuration.rows[i].chars, g_Configuration.rows[i].size);
+		pointer += g_Configuration.rows[i].size; *pointer = '\n';
+		pointer++;
     }
     return buffer;
 }
@@ -238,25 +239,25 @@ void moveCursor(int key) {
     
     switch(key) {
         case LEFT:
-	    if (g_Configuration.cursorX != 0) g_Configuration.cursorX--;
-	    else if (g_Configuration.cursorY > 0) {
-		g_Configuration.cursorY--;
-		g_Configuration.cursorX = g_Configuration.rows[g_Configuration.cursorY].size;
-	    }
-	    break;
+			if (g_Configuration.cursorX != 0) g_Configuration.cursorX--;
+			else if (g_Configuration.cursorY > 0) {
+				g_Configuration.cursorY--;
+				g_Configuration.cursorX = g_Configuration.rows[g_Configuration.cursorY].size;
+			}
+			break;
         case RIGHT:
-	    if (row && g_Configuration.cursorX < (unsigned int)row->size) g_Configuration.cursorX++;
-	    else if (g_Configuration.cursorY > 0) {
-		g_Configuration.cursorY++;
-		g_Configuration.cursorX = 0;
-	    }
-	    break;
+			if (row && g_Configuration.cursorX < (unsigned int)row->size) g_Configuration.cursorX++;
+			else if (g_Configuration.cursorY > 0) {
+				g_Configuration.cursorY++;
+				g_Configuration.cursorX = 0;
+			}
+			break;
         case DOWN:
-	    if (g_Configuration.cursorY < g_Configuration.numberRows) g_Configuration.cursorY++;
-	    break;
+			if (g_Configuration.cursorY < g_Configuration.numberRows) g_Configuration.cursorY++;
+			break;
         case UP:
-	    if (g_Configuration.cursorY != 0) g_Configuration.cursorY--;
-	    break;
+			if (g_Configuration.cursorY != 0) g_Configuration.cursorY--;
+			break;
     }
     row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
     unsigned int rowLength = row ? row->size : 0;
@@ -445,19 +446,19 @@ void findCallback(char *query, int key) {
     static int direction = 1;
 
     if (key == '\r' || key == '\x1b') {
-	last_match = -1;
-	direction = 1;
-	return;
+		last_match = -1;
+		direction = 1;
+		return;
     }
     else if (key == DOWN) {
-	direction = 1;
+		direction = 1;
     }
     else if (key == UP) {
-	direction = -1;
+		direction = -1;
     }
     else {
-	last_match = -1;
-	direction = 1;
+		last_match = -1;
+		direction = 1;
     }
     
     if (last_match == -1) direction = 1;
@@ -491,14 +492,22 @@ void find(void) {
     
     char *query = prompt("Search for: %s", findCallback);
     if (query)
-	free(query);
+		free(query);
     else {
-	g_Configuration.colsOff = savedColsOff;
-	g_Configuration.rowsOff = savedRowsOff;
-	g_Configuration.cursorX = savedCursorX;
-	g_Configuration.cursorY = savedCursorY;
+		g_Configuration.colsOff = savedColsOff;
+		g_Configuration.rowsOff = savedRowsOff;
+		g_Configuration.cursorX = savedCursorX;
+		g_Configuration.cursorY = savedCursorY;
     }
     return;
+}
+
+void file_open(void) {
+	char *file_path = prompt("Open file at: %s", NULL);
+	if (file_path == NULL) setStatusMessage("Opening file operation aborted.");
+	init(); editorOpen(file_path);
+	refreshScreen();
+	return;
 }
 
 void drawStatusBar(struct ABUF *bff) {
@@ -573,6 +582,19 @@ void refreshScreen(void) {
     return;
 }
 
+void control(void) {
+	int next = readKey();
+	switch (next) {
+		case CTRL_KEY('o'):
+			file_open();
+			break;
+		case CTRL_KEY('s'):
+			save();
+			break;
+	}
+	return;
+}
+
 void keyPress(void) {
     ROW *row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
     static int quit_times = QUIT_TIMES;
@@ -592,75 +614,75 @@ void keyPress(void) {
 			exit(0);
 			break;
 	
-	case HOME:
-	    g_Configuration.cursorX = 0;
-	    break;
-	case END:
-	    row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
-	    unsigned int rowLength = row ? row->size : 0;
-	    if (g_Configuration.cursorX < rowLength) g_Configuration.cursorX = rowLength;
-	    break;
-	
-	case CTRL_KEY('x'):
-	    save();
-	    break;
-
-	case CTRL_KEY('s'):
-	    find();
-	    break;
-
-	case DELETE:
-		if (g_Configuration.cursorY != 0) {
-			if (g_Configuration.cursorX != 0) rowDeleteChar(row, g_Configuration.cursorX);
-			else {
-				if (g_Configuration.rows[g_Configuration.cursorY].size > 0) rowDeleteChar(row, g_Configuration.cursorX);
-				else                                                        deleteRow(g_Configuration.cursorY);
-			}
-		} else {
-			if (g_Configuration.cursorX != 0) deleteRow(g_Configuration.cursorY + 1);
-			else {
-				deleteRow(g_Configuration.cursorY);
-				g_Configuration.cursorX = 0;
-			}
-		}
-		break;
-	
-	case BACKSPACE:
-	    deleteChar();
-	    break;
-	
-	case PAGE_DOWN:
-	case PAGE_UP:
-	    {
-		if (c == PAGE_DOWN) {
-		    g_Configuration.cursorY = g_Configuration.rowsOff + g_Configuration.screenRows -  1;
-		    if (g_Configuration.cursorY > g_Configuration.numberRows)
-		        g_Configuration.cursorY = g_Configuration.numberRows;
-		}
-		else if (c == PAGE_UP) {
-		    g_Configuration.cursorY = g_Configuration.rowsOff;
-		}
+		case HOME:
+	    	g_Configuration.cursorX = 0;
+	    	break;
+		case END:
+	    	row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
+	    	unsigned int rowLength = row ? row->size : 0;
+	    	if (g_Configuration.cursorX < rowLength) g_Configuration.cursorX = rowLength;
+	    	break;
 		
-		int times = g_Configuration.screenRows;
-		while (times--)
-		    moveCursor(c == PAGE_UP ? UP : DOWN);
-	    }
-	    break;
+		case CTRL_KEY('x'):
+			control();
+	    	break;
+
+		case CTRL_KEY('s'):
+	    	find();
+	    	break;
+
+		case DELETE:
+			if (g_Configuration.cursorY != 0) {
+				if (g_Configuration.cursorX != 0) rowDeleteChar(row, g_Configuration.cursorX);
+				else {
+					if (g_Configuration.rows[g_Configuration.cursorY].size > 0) rowDeleteChar(row, g_Configuration.cursorX);
+					else                                                        deleteRow(g_Configuration.cursorY);
+				}
+			} else {
+				if (g_Configuration.cursorX != 0) deleteRow(g_Configuration.cursorY + 1);
+				else {
+					deleteRow(g_Configuration.cursorY);
+					g_Configuration.cursorX = 0;
+				}
+			}
+			break;
 	
-	case RIGHT:
-	case LEFT:
-	case DOWN:
-	case UP:
-	    moveCursor(c);
-	    break;
+		case BACKSPACE:
+	    	deleteChar();
+	    	break;
 	
-	case CTRL_KEY('l'):
-		g_Configuration.rowsOff = g_Configuration.cursorY - (g_Configuration.screenRows / 2) + 1;
-	    break;
+		case PAGE_DOWN:
+		case PAGE_UP:
+	    	{
+				if (c == PAGE_DOWN) {
+		    		g_Configuration.cursorY = g_Configuration.rowsOff + g_Configuration.screenRows -  1;
+		    		if (g_Configuration.cursorY > g_Configuration.numberRows)
+		        		g_Configuration.cursorY = g_Configuration.numberRows;
+				}
+				else if (c == PAGE_UP) {
+		    		g_Configuration.cursorY = g_Configuration.rowsOff;
+				}
+		
+				int times = g_Configuration.screenRows;
+				while (times--)
+		    		moveCursor(c == PAGE_UP ? UP : DOWN);
+	    	}
+	   		break;
 	
-	default:
-	    insertChar(c);
-	    break;
+		case RIGHT:
+		case LEFT:
+		case DOWN:
+		case UP:
+	    	moveCursor(c);
+	    	break;
+		
+		case CTRL_KEY('l'):
+			g_Configuration.rowsOff = g_Configuration.cursorY - (g_Configuration.screenRows / 2) + 1;
+	    	break;
+	
+		default:
+	    	insertChar(c);
+	    	break;
     }
     quit_times = QUIT_TIMES;
     return;
@@ -711,7 +733,7 @@ int readKey(void) {
 	        	case 'F': return END;
 	    	}
 		}
-		return '\x1b';
+		return c;
     } else {
 		switch (c) {
 	 		// Emacs-like
@@ -722,6 +744,8 @@ int readKey(void) {
 	    
 	    	case CTRL_KEY('a'): return HOME;
 	    	case CTRL_KEY('e'): return END;
+			
+			case CTRL_KEY('v'): return PAGE_DOWN;
 		}
     }
     return c;
@@ -777,19 +801,26 @@ void editorScroll(void) {
     
     if (g_Configuration.cursorY < g_Configuration.rowsOff) g_Configuration.rowsOff = g_Configuration.cursorY;
     if (g_Configuration.cursorY >= g_Configuration.rowsOff + g_Configuration.screenRows) g_Configuration.rowsOff = g_Configuration.cursorY - g_Configuration.screenRows + 1;
-    
-    if (g_Configuration.renderX < g_Configuration.colsOff) g_Configuration.colsOff = g_Configuration.renderX;
-    if (g_Configuration.renderX >= g_Configuration.colsOff + g_Configuration.screenCols) g_Configuration.colsOff = g_Configuration.renderX - g_Configuration.screenCols + 1;
+ 	
+	if (g_Configuration.cursorX < g_Configuration.colsOff) {
+		g_Configuration.colsOff = g_Configuration.cursorX;
+	}
+	if (g_Configuration.cursorX >= g_Configuration.colsOff + g_Configuration.screenCols) {
+		g_Configuration.colsOff = g_Configuration.cursorX - g_Configuration.screenCols + 1;
+	}
+	
+    // if (g_Configuration.renderX < g_Configuration.colsOff) g_Configuration.colsOff = g_Configuration.renderX;
+    // if (g_Configuration.renderX >= g_Configuration.colsOff + g_Configuration.screenCols) g_Configuration.colsOff = g_Configuration.renderX - g_Configuration.screenCols + 1;
     return;
 }
 
 void save(void) {
     if (g_Configuration.filename == NULL) {
-	g_Configuration.filename = prompt("Save new file as: %s", NULL);
-	if (g_Configuration.filename == NULL) {
-	    setStatusMessage("Saving process aborted.");
-	    return;
-	}
+		g_Configuration.filename = prompt("Save new file as: %s", NULL);
+		if (g_Configuration.filename == NULL) {
+	    	setStatusMessage("Saving process aborted.");
+	    	return;
+		}
     }
     unsigned int length;
     char *buffer = rowsToString(&length);
@@ -862,11 +893,11 @@ int main(int argc, char *argv[]) {
     
     init();
     if (argc >= 2)
-	editorOpen(argv[1]);
+		editorOpen(argv[1]);
     setStatusMessage("Hello from Charlie!");
     while (1) {
-	refreshScreen();
-	keyPress();
+		refreshScreen();
+		keyPress();
     }
     return 0;
 }
