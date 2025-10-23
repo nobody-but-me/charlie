@@ -674,55 +674,55 @@ int readKey(void) {
     }
     
     if (c == '\x1b') {
-	char sequence[3];
-	if (read(STDIN_FILENO, &sequence[0], 1) != 1) return '\x1b';
-	if (read(STDIN_FILENO, &sequence[1], 1) != 1) return '\x1b';
+		char sequence[3];
+		if (read(STDIN_FILENO, &sequence[0], 1) != 1) return '\x1b';
+		if (read(STDIN_FILENO, &sequence[1], 1) != 1) return '\x1b';
 	
-	if (sequence[0] == '[') {
-	    if (sequence[1] >= '0' && sequence[1] <= '9') {
-		if (read(STDIN_FILENO, &sequence[2], 1) != 1) return '\x1b';
-		if (sequence[2] == '~') {
-		    switch (sequence[1]) {
-		        case '6': return PAGE_DOWN;
-		        case '5': return PAGE_UP;
+		if (sequence[0] == '[') {
+	    	if (sequence[1] >= '0' && sequence[1] <= '9') {
+				if (read(STDIN_FILENO, &sequence[2], 1) != 1) return '\x1b';
+				if (sequence[2] == '~') {
+		    		switch (sequence[1]) {
+		        		case '6': return PAGE_DOWN;
+		        		case '5': return PAGE_UP;
 			
-		        case '1': return HOME;
-		        case '7': return HOME;
-		        case '4': return END;
-		        case '8': return END;
+						case '1': return HOME;
+		        		case '7': return HOME;
+		        		case '4': return END;
+		        		case '8': return END;
 			
-			case '3': return DELETE;
-		    }
+						case '3': return DELETE;
+					}
+				}
+	    	} else {
+				switch (sequence[1]) {
+		  		  	case 'C': return RIGHT;
+		    		case 'D': return LEFT;
+		    		case 'B': return DOWN;
+		    		case 'A': return UP;
+		    		
+		    		case 'H': return HOME;
+		    		case 'F': return END;
+				}
+			}
+		} else if (sequence[0] == '0') {
+	    	switch (sequence[1]) {
+	        	case 'H': return HOME;
+	        	case 'F': return END;
+	    	}
 		}
-	    } else {
-		switch (sequence[1]) {
-		    case 'C': return RIGHT;
-		    case 'D': return LEFT;
-		    case 'B': return DOWN;
-		    case 'A': return UP;
-		    
-		    case 'H': return HOME;
-		    case 'F': return END;
-	        }
-	    }
-	} else if (sequence[0] == '0') {
-	    switch (sequence[1]) {
-	        case 'H': return HOME;
-	        case 'F': return END;
-	    }
-	}
-	return '\x1b';
+		return '\x1b';
     } else {
-	switch (c) {
-	    // Emacs-like
-	    case CTRL_KEY('f'): return RIGHT;
-	    case CTRL_KEY('b'): return LEFT;
-	    case CTRL_KEY('n'): return DOWN;
-	    case CTRL_KEY('p'): return UP;
+		switch (c) {
+	 		// Emacs-like
+	  		case CTRL_KEY('f'): return RIGHT;
+	    	case CTRL_KEY('b'): return LEFT;
+	    	case CTRL_KEY('n'): return DOWN;
+	    	case CTRL_KEY('p'): return UP;
 	    
-	    case CTRL_KEY('a'): return HOME;
-	    case CTRL_KEY('e'): return END;
-	}
+	    	case CTRL_KEY('a'): return HOME;
+	    	case CTRL_KEY('e'): return END;
+		}
     }
     return c;
 }
