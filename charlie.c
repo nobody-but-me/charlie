@@ -113,6 +113,8 @@ void freeRow(ROW *row);
 void setStatusMessage(const char *formated_string, ...);
 void drawStatusMessage(struct ABUF *bff);
 
+char *prompt(char *prompt); // TODO: change the place of this function. Define and implement it before or after save(void) function.
+
 void drawStatusBar(struct ABUF *bff);
 void drawRows(struct ABUF *bff);
 void refreshScreen(void);
@@ -380,6 +382,41 @@ void drawStatusMessage(struct ABUF *bff) {
     bufferAppend(bff, "\x1b[m", 3);
 }
 
+char *prompt(char *prompt) {
+    size_t buffer_size = 128;
+    char *buffer = malloc(buffer_size);
+    
+    size_t buffer_length = 0;
+    buffer[0] = '\0';
+
+    while(1) {
+	setStatusMessage(prompt, buffer);
+	refreshScreen();
+	
+	int c = readKey();
+	if (c == BACKSPACE) {
+	    if (buffer_length != 0)
+		buffer[--buffer_length] = '\0';
+	} else if (c == '\x1b') {
+	    setStatusMessage("");
+	    free(buffer);
+	    return NULL;
+	} else if (c == '\r') {
+	    if (buffer_length != 0) {
+		setStatusMessage("");
+		return buffer;
+	    }
+	} else if (!iscntrl(c) && c < 128) {
+	    if (buffer_length == buffer_size - 1) {
+		buffer_size *= 2;
+		buffer = realloc(buffer, buffer_size);
+	    }
+	    buffer[buffer_length++] = c;
+	    buffer[buffer_length] = '\0';
+	}
+    }
+}
+
 void drawStatusBar(struct ABUF *bff) {
     bufferAppend(bff, "\x1b[7m", 4);
     char status[80];
@@ -643,7 +680,13 @@ void editorScroll(void) {
 }
 
 void save(void) {
-    if (g_Configuration.filename == NULL) return; // TODO: create a new file if filename == NULL;
+    if (g_Configuration.filename == NULL) {
+	g_Configuration.filename = prompt("Save new file as: %s");
+	if (g_Configuration.filename == NULL) {
+	    setStatusMessage("Saving process aborted.");
+	    return;
+	}
+    }
     unsigned int length;
     char *buffer = rowsToString(&length);
     
