@@ -98,10 +98,17 @@ void moveCursor(int key);
 void disableRawMode(void);
 void enableRawMode(void);
 
+void rowAppendString(ROW *row, char *string, size_t length);
 void rowInsertChar(ROW *row, int at, int character);
 void rowDeleteChar(ROW *row, int at);
+
+void insertNewLine(void);
+
 void insertChar(int character);
 void deleteChar(void);
+
+void deleteRow(unsigned int at);
+void freeRow(ROW *row);
 
 void setStatusMessage(const char *formated_string, ...);
 void drawStatusMessage(struct ABUF *bff);
@@ -113,7 +120,7 @@ void refreshScreen(void);
 void keyPress(void);
 int readKey(void);
 
-void appendRow(char *string, size_t length);
+void insertRow(int at, char *string, size_t length);
 void updateRow(ROW *row);
 
 void editorScroll(void);
@@ -263,6 +270,17 @@ void enableRawMode(void) {
     return;
 }
 
+void rowAppendString(ROW *row, char *string, size_t length) {
+    row->chars = realloc(row->chars, row->size + length + 1);
+    memcpy(&row->chars[row->size], string, length);
+    row->size += length;
+    
+    row->chars[row->size] = '\0';
+    updateRow(row);
+    
+    g_Configuration.dirty++;
+    return;
+}
 void rowInsertChar(ROW *row, int at, int character) {
     if (at < 0 || at > row->size) at = row->size;
     row->chars = realloc(row->chars, row->size + 2);
@@ -282,23 +300,60 @@ void rowDeleteChar(ROW *row, int at) {
     updateRow(row);
 }
 
+void insertNewLine(void) {
+    if (g_Configuration.cursorX == 0)
+	insertRow(g_Configuration.cursorY, "", 0);
+    else {
+	ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
+
+	insertRow(g_Configuration.cursorY + 1, &row->chars[g_Configuration.cursorX], row->size - g_Configuration.cursorX);
+	row = &g_Configuration.rows[g_Configuration.cursorY];
+	row->size = g_Configuration.cursorX;
+	row->chars[row->size] = '\0';
+	updateRow(row);
+    }
+    g_Configuration.cursorX = 0;
+    g_Configuration.cursorY++;
+    return;
+}
+
 void insertChar(int character) {
     if (g_Configuration.cursorY == g_Configuration.numberRows)
-	appendRow("", 0);
+	insertRow(g_Configuration.numberRows, "", 0);
     rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, character);
     g_Configuration.cursorX++;
     g_Configuration.dirty++;
     return;
 }
 void deleteChar(void) {
-    if (g_Configuration.cursorY == g_Configuration.numberRows)
-	return;
+    if (g_Configuration.cursorX == 0 && g_Configuration.cursorY == 0) return;
+    if (g_Configuration.cursorY == g_Configuration.numberRows) return;
+    
     ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
     if (g_Configuration.cursorX > 0) {
 	rowDeleteChar(row, g_Configuration.cursorX - 1);
 	g_Configuration.cursorX--;
-	g_Configuration.dirty++;
+    } else {
+	g_Configuration.cursorX = g_Configuration.rows[g_Configuration.cursorY - 1].size;
+	rowAppendString(&g_Configuration.rows[g_Configuration.cursorY - 1], row->chars, row->size);
+	deleteRow(g_Configuration.cursorY);
+	g_Configuration.cursorY--;
     }
+    return;
+}
+
+void deleteRow(unsigned int at) {
+    if (at < 0 || at >= g_Configuration.numberRows) return;
+    freeRow(&g_Configuration.rows[at]);
+    
+    memmove(&g_Configuration.rows[at], &g_Configuration.rows[at + 1], sizeof(ROW) * (g_Configuration.numberRows - at - 1));
+    g_Configuration.numberRows--;
+    g_Configuration.dirty++;
+    return;
+}
+void freeRow(ROW *row) {
+    free(row->render);
+    free(row->chars);
     return;
 }
 
@@ -402,7 +457,9 @@ void keyPress(void) {
     static int quit_times = QUIT_TIMES;
     int c = readKey();
     switch (c) {
-        case '\r': break;
+        case '\r':
+	    insertNewLine();
+	    break;
         case 27:
 	    if (g_Configuration.dirty && quit_times > 0) {
 		setStatusMessage("File has unsaved changes! If you're sure, press ESC key %d more times to quit.", quit_times);
@@ -529,17 +586,18 @@ int readKey(void) {
     return c;
 }
 
-void appendRow(char *string, size_t length) {
+void insertRow(int at, char *string, size_t length) {
+    if (at < 0 || (unsigned int/*i hate you daniel*/)at > g_Configuration.numberRows) return;
     g_Configuration.rows = realloc(g_Configuration.rows, sizeof(ROW) * (g_Configuration.numberRows + 1));
-    int at = g_Configuration.numberRows;
+    memmove(&g_Configuration.rows[at + 1], &g_Configuration.rows[at], sizeof(ROW) * (g_Configuration.numberRows - at));
     
     g_Configuration.rows[at].size = length;
     g_Configuration.rows[at].chars = malloc(length + 1);
     memcpy(g_Configuration.rows[at].chars, string, length);
     g_Configuration.rows[at].chars[length] = '\0';
     
-    g_Configuration.rows[at].render = NULL;
     g_Configuration.rows[at].rsize = 0;
+    g_Configuration.rows[at].render = NULL;
     updateRow(&g_Configuration.rows[at]);
     
     g_Configuration.numberRows++;
@@ -622,7 +680,7 @@ void editorOpen(const char *file_path) {
     while ((length = getline(&line, &capacity, file)) != -1) {
 	while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r'))
 	    length--;
-	appendRow(line, length);
+	insertRow(g_Configuration.numberRows, line, length);
     }
     
     g_Configuration.dirty = 0;
@@ -652,11 +710,12 @@ void init(void) {
     return;
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
     enableRawMode();
     
-    init(); editorOpen("../../test.c");
-    
+    init();
+    if (argc >= 2)
+	editorOpen(argv[1]);
     setStatusMessage("Hello from Charlie!");
     while (1) {
 	refreshScreen();
