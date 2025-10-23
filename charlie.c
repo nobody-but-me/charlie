@@ -579,24 +579,23 @@ void keyPress(void) {
     int c = readKey();
     switch (c) {
         case '\r':
-	    insertNewLine();
-	    break;
+			insertNewLine();
+			break;
         case 27:
-	    if (g_Configuration.dirty && quit_times > 0) {
-		setStatusMessage("File has unsaved changes! If you're sure, press ESC key %d more times to quit.", quit_times);
-		quit_times--;
-		return;
-	    }
-	    write(STDOUT_FILENO, "\x1b[2J", 4);
-	    write(STDOUT_FILENO, "\x1b[H", 3);
-	    exit(0);
-	    break;
+			if (g_Configuration.dirty && quit_times > 0) {
+				setStatusMessage("File has unsaved changes! If you're sure, press ESC key %d more times to quit.", quit_times);
+				quit_times--;
+				return;
+			}
+			write(STDOUT_FILENO, "\x1b[2J", 4);
+			write(STDOUT_FILENO, "\x1b[H", 3);
+			exit(0);
+			break;
 	
 	case HOME:
 	    g_Configuration.cursorX = 0;
 	    break;
 	case END:
-	    // g_Configuration.cursorX = g_Configuration.screenCols - 1;
 	    row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
 	    unsigned int rowLength = row ? row->size : 0;
 	    if (g_Configuration.cursorX < rowLength) g_Configuration.cursorX = rowLength;
@@ -656,6 +655,7 @@ void keyPress(void) {
 	    break;
 	
 	case CTRL_KEY('l'):
+		g_Configuration.rowsOff = g_Configuration.cursorY - (g_Configuration.screenRows / 2) + 1;
 	    break;
 	
 	default:
