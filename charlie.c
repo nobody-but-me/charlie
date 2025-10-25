@@ -118,6 +118,7 @@ void drawStatusMessage(struct ABUF *bff);
 
 char *prompt(char *prompt, void (*callback)(char *, int));
 void file_open(void);
+void command(void);
 void find(void);
 
 void drawStatusBar(struct ABUF *bff);
@@ -513,6 +514,28 @@ void file_open(void) {
 	return;
 }
 
+void command(void) {
+	char *command = prompt("Exec. command: %s", NULL);
+	if (command == NULL) {
+		setStatusMessage("Exec. of command aborted.");
+		return;
+	}
+	
+	switch (command) {
+		case "quit":
+			setStatusMessage("quitting");
+			break;
+	}
+	
+	// if (strcmp(command, "quit") == 0) {
+	//	write(STDOUT_FILENO, "\x1b[2J", 4);
+//		write(STDOUT_FILENO, "\x1b[H", 3);
+//		exit(0);
+//		return;
+	}
+	return;
+}
+
 void drawStatusBar(struct ABUF *bff) {
     bufferAppend(bff, "\x1b[7m", 4);
     char status[80];
@@ -591,6 +614,9 @@ void control(void) {
 		case CTRL_KEY('o'):
 			file_open();
 			break;
+		case CTRL_KEY('c'):
+			command();
+			break;
 		case CTRL_KEY('s'):
 			save();
 			break;
@@ -603,6 +629,7 @@ void keyPress(void) {
     static int quit_times = QUIT_TIMES;
     int c = readKey();
     switch (c) {
+		case CTRL_KEY('c'): break;
         case '\r':
 			insertNewLine();
 			break;
