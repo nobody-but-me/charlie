@@ -23,3 +23,7 @@ As I wrote some lines above, the project is highly inspired by kilo, which means
 
 and follow the instructions.
 
+# Other
+
+If anyone's curious: I am using the "feminine version" of Charlie name.
+

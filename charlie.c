@@ -23,7 +23,7 @@
 #include <errno.h>
 
 #define COLUMN_SYMBOL "."
-#define VERSION "0.0.1"
+#define VERSION "0.0.2"
 #define QUIT_TIMES 1
 #define TAB_STOP 4
 
@@ -120,6 +120,8 @@ char *prompt(char *prompt, void (*callback)(char *, int));
 void file_open(void);
 void command(void);
 void find(void);
+
+void shell(void);
 
 void drawStatusBar(struct ABUF *bff);
 void drawRows(struct ABUF *bff);
@@ -514,6 +516,20 @@ void file_open(void) {
 	return;
 }
 
+void shell(void) {
+	char *shell_command = prompt("Shell command: %s", NULL);
+	if (shell_command == NULL) {
+		setStatusMessage("Shell command operation aborted.");
+		return;
+	}
+	if (system(shell_command) < 0) {
+		setStatusMessage("Command is not valid and/or is not available.");
+		return;
+	}
+	setStatusMessage("Command executed successfully");
+	return;
+}
+
 void command(void) {
 	char *command = prompt("Exec. command: %s", NULL);
 	if (command == NULL) {
@@ -521,26 +537,40 @@ void command(void) {
 		return;
 	}
 	
-	switch (command) {
-		case "quit":
-			setStatusMessage("quitting");
-			break;
+	if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
+		write(STDOUT_FILENO, "\x1b[2J", 4);
+		write(STDOUT_FILENO, "\x1b[H", 3);
+		exit(0);
+		return;
 	}
-	
-	// if (strcmp(command, "quit") == 0) {
-	//	write(STDOUT_FILENO, "\x1b[2J", 4);
-//		write(STDOUT_FILENO, "\x1b[H", 3);
-//		exit(0);
-//		return;
+	else if (strcmp(command, "version") == 0 || strcmp(command, "charlie_version") == 0) {
+		setStatusMessage("Current Charlie Version: %s", VERSION);
+		return;
 	}
+	else if (strcmp(command, "humans-apes?") == 0 || strcmp(command, "humans-apes") == 0) {
+		setStatusMessage("Yes, Miranda. We are all apes.");
+		return;
+	}
+	else if (strcmp(command, "shell") == 0) {
+		shell();
+		return;
+	}
+	setStatusMessage("Command not found.");
 	return;
 }
 
 void drawStatusBar(struct ABUF *bff) {
     bufferAppend(bff, "\x1b[7m", 4);
     char status[80];
-    
-    unsigned int length = snprintf(status, sizeof(status), "%.20s %s [line %u/%u][column %u/%u]", g_Configuration.filename ? g_Configuration.filename : "[New File]", g_Configuration.dirty ? "(modified)" : "", g_Configuration.cursorY, g_Configuration.numberRows, g_Configuration.cursorX, g_Configuration.screenCols);
+	
+	float lines_percentage = 0.0f;
+	if (g_Configuration.numberRows >  0) lines_percentage = (float)g_Configuration.cursorY / g_Configuration.numberRows * 100.0f;
+    unsigned int length = snprintf(status, sizeof(status), "[%.20s] %s (%.1f%%)[line %u/%u][column %u/%u]",
+						g_Configuration.filename ? g_Configuration.filename : "New File",
+						g_Configuration.dirty ? "(modified)" : "",
+						lines_percentage,
+						g_Configuration.cursorY, g_Configuration.numberRows,
+						g_Configuration.cursorX, g_Configuration.screenCols);
     
     if (length > g_Configuration.screenCols)
 	length = g_Configuration.screenCols;
@@ -559,19 +589,19 @@ void drawRows(struct ABUF *bff) {
 	unsigned int fileRow = y + g_Configuration.rowsOff;
 	if (fileRow >= g_Configuration.numberRows) {
 	    if (g_Configuration.numberRows == 0 && y == g_Configuration.screenRows / 2) {
-		char welcomeMessage[80];
-		unsigned int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie Text Editor %s", VERSION);
-		if (welcomeLength > g_Configuration.screenCols) welcomeLength = g_Configuration.screenCols;
+			char welcomeMessage[80];
+			unsigned int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie, the Text Editor %s", VERSION);
+			if (welcomeLength > g_Configuration.screenCols) welcomeLength = g_Configuration.screenCols;
 		
-		int padding = (g_Configuration.screenCols - welcomeLength) / 2;
-		if (padding) {
-		    bufferAppend(bff, COLUMN_SYMBOL, 1);
-		    padding--;
-		}
-		while (padding--) bufferAppend(bff, " ", 1);
-		bufferAppend(bff, welcomeMessage, welcomeLength);
+			int padding = (g_Configuration.screenCols - welcomeLength) / 2;
+			if (padding) {
+		    	bufferAppend(bff, COLUMN_SYMBOL, 1);
+		    	padding--;
+			}
+			while (padding--) bufferAppend(bff, " ", 1);
+				bufferAppend(bff, welcomeMessage, welcomeLength);
 	    } else {
-		bufferAppend(bff, COLUMN_SYMBOL, 1);
+			bufferAppend(bff, COLUMN_SYMBOL, 1);
 	    }
 	} else {
 	    unsigned int length = g_Configuration.rows[fileRow].rsize - g_Configuration.colsOff;
@@ -915,6 +945,7 @@ void init(void) {
     if (getWindowSize(&g_Configuration.screenRows, &g_Configuration.screenCols) == -1)
         error("getWindowSize");
     g_Configuration.screenRows -= 2;
+	g_Configuration.screenCols -= 2;
     return;
 }
 
