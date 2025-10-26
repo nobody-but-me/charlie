@@ -325,15 +325,15 @@ void rowDeleteChar(ROW *row, int at) {
 
 void insertNewLine(void) {
     if (g_Configuration.cursorX == 0)
-	insertRow(g_Configuration.cursorY, "", 0);
+		insertRow(g_Configuration.cursorY, "", 0);
     else {
-	ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
+		ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
 
-	insertRow(g_Configuration.cursorY + 1, &row->chars[g_Configuration.cursorX], row->size - g_Configuration.cursorX);
-	row = &g_Configuration.rows[g_Configuration.cursorY];
-	row->size = g_Configuration.cursorX;
-	row->chars[row->size] = '\0';
-	updateRow(row);
+		insertRow(g_Configuration.cursorY + 1, &row->chars[g_Configuration.cursorX], row->size - g_Configuration.cursorX);
+		row = &g_Configuration.rows[g_Configuration.cursorY];
+		row->size = g_Configuration.cursorX;
+		row->chars[row->size] = '\0';
+		updateRow(row);
     }
     g_Configuration.cursorX = 0;
     g_Configuration.cursorY++;
@@ -660,7 +660,19 @@ void control(void) {
 			break;
 		case DELETE:
 			deleteRow(g_Configuration.cursorY);
-			insertNewLine();
+			if (g_Configuration.cursorX == 0)
+				insertRow(g_Configuration.cursorY, "", 0);
+			else {
+				ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
+				
+				insertRow(g_Configuration.cursorY + 1, &row->chars[g_Configuration.cursorX], row->size - g_Configuration.cursorX);
+				row = &g_Configuration.rows[g_Configuration.cursorY];
+				row->size = g_Configuration.cursorX;
+				row->chars[row->size] = '\0';
+				updateRow(row);
+			}
+			g_Configuration.cursorX = 0;
+			//insertNewLine();
 			break;
 	}
 	return;
