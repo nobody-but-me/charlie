@@ -120,6 +120,7 @@ void file_open(void);
 void command(void);
 void find(void);
 
+void goto_line(void);
 void shell(void);
 
 void drawStatusBar(struct ABUF *bff);
@@ -515,6 +516,19 @@ void file_open(void) {
 	return;
 }
 
+void goto_line(void) {
+	char *input_number = prompt("Go to line: %s", NULL);
+	if (input_number == NULL) {
+		setStatusMessage("Goto-line operation aborted.");
+		return;
+	}
+	int number = atoi(input_number);
+	
+	g_Configuration.cursorY = (unsigned int)number;
+	setStatusMessage("Cursor placed in %d line.", number);
+	return;
+}
+
 void shell(void) {
 	char *shell_command = prompt("Shell command: %s", NULL);
 	if (shell_command == NULL) {
@@ -544,7 +558,8 @@ void command(void) {
 	}
 	else if (strcmp(command, "version") == 0 || strcmp(command, "charlie_version") == 0) { setStatusMessage("Current Charlie Version: %s", VERSION); return; }
 	else if (strcmp(command, "humans-apes?") == 0 || strcmp(command, "humans-apes") == 0) { setStatusMessage("Yes, Miranda. We are all apes."); return; }
-	else if (strcmp(command, "current_line") == 0) { setStatusMessage("%d", g_Configuration.cursorY); return; }
+	else if (strcmp(command, "current-line") == 0) { setStatusMessage(" %d ", g_Configuration.cursorY); return; }
+	else if (strcmp(command, "goto-line") == 0) { goto_line(); return; }
 	else if (strcmp(command, "open") == 0) { file_open(); return; }
 	else if (strcmp(command, "shell") == 0) { shell(); return; }
 	
@@ -645,19 +660,7 @@ void control(void) {
 			break;
 		case DELETE:
 			deleteRow(g_Configuration.cursorY);
-			if (g_Configuration.cursorX == 0)
-				insertRow(g_Configuration.cursorY, "", 0);
-			else {
-				ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
-				
-				insertRow(g_Configuration.cursorY + 1, &row->chars[g_Configuration.cursorX], row->size - g_Configuration.cursorX);
-				row = &g_Configuration.rows[g_Configuration.cursorY];
-				row->size = g_Configuration.cursorX;
-				row->chars[row->size] = '\0';
-				
-				updateRow(row);
-			}
-			g_Configuration.cursorX = 0;
+			insertNewLine();
 			break;
 	}
 	return;
