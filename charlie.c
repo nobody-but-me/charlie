@@ -27,7 +27,6 @@
 #define QUIT_TIMES 1
 #define TAB_STOP 4
 
-
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define ABUF_INIT { NULL, 0 }
 
@@ -543,18 +542,12 @@ void command(void) {
 		exit(0);
 		return;
 	}
-	else if (strcmp(command, "version") == 0 || strcmp(command, "charlie_version") == 0) {
-		setStatusMessage("Current Charlie Version: %s", VERSION);
-		return;
-	}
-	else if (strcmp(command, "humans-apes?") == 0 || strcmp(command, "humans-apes") == 0) {
-		setStatusMessage("Yes, Miranda. We are all apes.");
-		return;
-	}
-	else if (strcmp(command, "shell") == 0) {
-		shell();
-		return;
-	}
+	else if (strcmp(command, "version") == 0 || strcmp(command, "charlie_version") == 0) { setStatusMessage("Current Charlie Version: %s", VERSION); return; }
+	else if (strcmp(command, "humans-apes?") == 0 || strcmp(command, "humans-apes") == 0) { setStatusMessage("Yes, Miranda. We are all apes."); return; }
+	else if (strcmp(command, "current_line") == 0) { setStatusMessage("%d", g_Configuration.cursorY); return; }
+	else if (strcmp(command, "open") == 0) { file_open(); return; }
+	else if (strcmp(command, "shell") == 0) { shell(); return; }
+	
 	setStatusMessage("Command not found.");
 	return;
 }
@@ -649,6 +642,22 @@ void control(void) {
 			break;
 		case CTRL_KEY('s'):
 			save();
+			break;
+		case DELETE:
+			deleteRow(g_Configuration.cursorY);
+			if (g_Configuration.cursorX == 0)
+				insertRow(g_Configuration.cursorY, "", 0);
+			else {
+				ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
+				
+				insertRow(g_Configuration.cursorY + 1, &row->chars[g_Configuration.cursorX], row->size - g_Configuration.cursorX);
+				row = &g_Configuration.rows[g_Configuration.cursorY];
+				row->size = g_Configuration.cursorX;
+				row->chars[row->size] = '\0';
+				
+				updateRow(row);
+			}
+			g_Configuration.cursorX = 0;
 			break;
 	}
 	return;
