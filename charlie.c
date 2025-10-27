@@ -24,7 +24,7 @@
 
 #define BACKUP_NECESSARY_CHARACTERS 350
 #define COLUMN_SYMBOL "."
-#define VERSION "0.0.2"
+#define VERSION "0.0.3"
 #define QUIT_TIMES 1
 #define TAB_STOP 4
 
@@ -115,6 +115,8 @@ void freeRow(ROW *row);
 
 void setStatusMessage(const char *formated_string, ...);
 void drawStatusMessage(struct ABUF *bff);
+
+void center_screen(void);
 
 char *prompt(char *prompt, void (*callback)(char *, int));
 void file_open(void);
@@ -562,6 +564,7 @@ void command(void) {
 	}
 	else if (strcmp(command, "version") == 0 || strcmp(command, "charlie_version") == 0) { setStatusMessage("Current Charlie Version: %s", VERSION); return; }
 	else if (strcmp(command, "humans-apes?") == 0 || strcmp(command, "humans-apes") == 0) { setStatusMessage("Yes, Miranda. We are all apes."); return; }
+	else if (strcmp(command, "center-screen") == 0) { center_screen(); setStatusMessage("Screen centered."); return; }
 	else if (strcmp(command, "current-line") == 0) { setStatusMessage(" %d ", g_Configuration.cursorY); return; }
 	else if (strcmp(command, "save-backup") == 0) { backup_save(); return; }
 	else if (strcmp(command, "goto-line") == 0) { goto_line(); return; }
@@ -572,11 +575,9 @@ void command(void) {
 		g_Configuration.statusMessageTime = 0;
 		setStatusMessage("");
 		
-		if (getWindowSize(&g_Configuration.screenRows,
-						&g_Configuration.screenCols) == -1)
+		if (getWindowSize(&g_Configuration.screenRows, &g_Configuration.screenCols) == -1)
 			error("getWindowSize");
 		g_Configuration.screenRows -= 2;
-		g_Configuration.screenCols -= 2;
 		refreshScreen();
 		return;
 	}
@@ -696,6 +697,13 @@ void control(void) {
 	return;
 }
 
+void center_screen(void) {
+	// that's gross.
+	int new_position = g_Configuration.cursorY - (g_Configuration.screenRows / 2) + 1;
+	if ((new_position * -1) < g_Configuration.rowsOff)
+		g_Configuration.rowsOff = new_position;
+	return;
+}
 void keyPress(void) {
     ROW *row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
     static int quit_times = QUIT_TIMES;
@@ -779,7 +787,7 @@ void keyPress(void) {
 	    	break;
 		
 		case CTRL_KEY('l'):
-			g_Configuration.rowsOff = g_Configuration.cursorY - (g_Configuration.screenRows / 2) + 1;
+			center_screen();
 	    	break;
 	
 		default:
@@ -1013,7 +1021,6 @@ void init(void) {
     if (getWindowSize(&g_Configuration.screenRows, &g_Configuration.screenCols) == -1)
         error("getWindowSize");
     g_Configuration.screenRows -= 2;
-	g_Configuration.screenCols -= 2;
     return;
 }
 
