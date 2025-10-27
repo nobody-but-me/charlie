@@ -60,16 +60,16 @@ enum KEYS {
 
 struct editorConfig {
     struct termios m_OriginalTermios;
-    unsigned int screenRows;
-    unsigned int screenCols;
+    int screenRows;
+    int screenCols;
     
-    unsigned int cursorX, cursorY;
-    unsigned int renderX;
+    int cursorX, cursorY;
+    int renderX;
     
-    unsigned int rowsOff;
-    unsigned int colsOff;
+    int rowsOff;
+    int colsOff;
     
-    unsigned int numberRows;
+    int numberRows;
     
     time_t statusMessageTime;
     char statusMessage[80];
@@ -84,18 +84,18 @@ struct ABUF {
     int length;
 };
 
-unsigned int rowCxToRx(ROW *row, unsigned int cursorX);
-unsigned int rowRxToCx(ROW *row, unsigned int renderX);
-char *rowsToString(unsigned int *bufferLength);
+int rowCxToRx(ROW *row, int cursorX );
+int rowRxToCx(ROW *row, int renderX );
+char *rowsToString(int *bufferLength);
 
-int getWindowSize(unsigned int *rows, unsigned int *cols);
+int getWindowSize(int *rows, int *cols);
 
 void error(const char *errorMessage);
 
 void bufferAppend(struct ABUF *bff, const char *string, int length);
 void bufferFree(struct ABUF *bff);
 
-int getCursorPosition(unsigned int *rows, unsigned int *cols);
+int getCursorPosition(int *rows, int *cols);
 void moveCursor(int key);
 
 void disableRawMode(void);
@@ -110,7 +110,7 @@ void insertNewLine(void);
 void insertChar(int character);
 void deleteChar(void);
 
-void deleteRow(unsigned int at);
+void deleteRow(int at);
 void freeRow(ROW *row);
 
 void setStatusMessage(const char *formated_string, ...);
@@ -150,17 +150,17 @@ void init(void);
 struct editorConfig g_Configuration;
 unsigned int backup_timer = 0;
 
-unsigned int rowCxToRx(ROW *row, unsigned int cursorX) {
-    unsigned int newRenderX = 0;
-    for (unsigned int i = 0; i < cursorX; i++) {
+int rowCxToRx(ROW *row, int cursorX) {
+    int newRenderX = 0;
+    for (int i = 0; i < cursorX; i++) {
 		if (row->chars[i] == '\t')
 			newRenderX += (TAB_STOP - 1) - (newRenderX % TAB_STOP);
 		newRenderX++;
     }
     return newRenderX;
 }
-unsigned int rowRxToCx(ROW *row, unsigned int renderX) {
-    unsigned int cursorRenderX = 0;
+int rowRxToCx(ROW *row, int renderX) {
+    int cursorRenderX = 0;
     int newCursorX;
     
     for (newCursorX = 0; newCursorX < row->size; newCursorX++) {
@@ -173,15 +173,15 @@ unsigned int rowRxToCx(ROW *row, unsigned int renderX) {
     return newCursorX;
 }
 
-char *rowsToString(unsigned int *bufferLength) {
+char *rowsToString(int *bufferLength) {
     int totalLength = 0;
-    for (unsigned int i = 0; i < g_Configuration.numberRows; i++)
+    for (int i = 0; i < g_Configuration.numberRows; i++)
 		totalLength += g_Configuration.rows[i].size + 1;
     *bufferLength = totalLength;
     
     char *buffer = malloc(totalLength);
     char *pointer = buffer;
-    for (unsigned int i = 0; i < g_Configuration.numberRows; i++) {
+    for (int i = 0; i < g_Configuration.numberRows; i++) {
 		memcpy(pointer, g_Configuration.rows[i].chars, g_Configuration.rows[i].size);
 		pointer += g_Configuration.rows[i].size; *pointer = '\n';
 		pointer++;
@@ -189,11 +189,11 @@ char *rowsToString(unsigned int *bufferLength) {
     return buffer;
 }
 
-int getWindowSize(unsigned int *rows, unsigned int *cols) {
+int getWindowSize(int *rows, int *cols) {
     struct winsize window_size;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &window_size) == -1 || window_size.ws_col == 0) {
-	if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
-	return getCursorPosition(rows, cols);
+		if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
+		return getCursorPosition(rows, cols);
     }
     *cols = window_size.ws_col;
     *rows = window_size.ws_row;
@@ -221,17 +221,16 @@ void bufferFree(struct ABUF *bff) {
     return;
 }
 
-int getCursorPosition(unsigned int *rows, unsigned int *cols) {
-    char buffer[32]; unsigned int i = 0;
+int getCursorPosition(int *rows, int *cols) {
+    char buffer[32]; unsigned long i = 0;
     
     if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4)
         return -1;
     
-    while (i < sizeof(buffer) - 1)
-    {
-	if (read(STDIN_FILENO, &buffer[i], 1) != 1) break;
-	if (buffer[i] == 'R') break;
-	i++;
+    while (i < sizeof(buffer) - 1) {
+		if (read(STDIN_FILENO, &buffer[i], 1) != 1) break;
+		if (buffer[i] == 'R') break;
+		i++;
     }
     buffer[i] = '\0';
     if (buffer[0] != '\x1b' || buffer[1] != '[')
@@ -252,7 +251,7 @@ void moveCursor(int key) {
 			}
 			break;
         case RIGHT:
-			if (row && g_Configuration.cursorX < (unsigned int)row->size) g_Configuration.cursorX++;
+			if (row && g_Configuration.cursorX < row->size) g_Configuration.cursorX++;
 			else if (g_Configuration.cursorY > 0) {
 				g_Configuration.cursorY++;
 				g_Configuration.cursorX = 0;
@@ -266,7 +265,8 @@ void moveCursor(int key) {
 			break;
     }
     row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
-    unsigned int rowLength = row ? row->size : 0;
+	
+    int rowLength = row ? row->size : 0;
     if (g_Configuration.cursorX > rowLength) g_Configuration.cursorX = rowLength;
     return;
 }
@@ -370,7 +370,7 @@ void deleteChar(void) {
     return;
 }
 
-void deleteRow(unsigned int at) {
+void deleteRow(int at) {
     if (at < 0 || at >= g_Configuration.numberRows) return;
     freeRow(&g_Configuration.rows[at]);
     
@@ -395,17 +395,17 @@ void setStatusMessage(const char *formated_string, ...) {
 }
 void drawStatusMessage(struct ABUF *bff) {
     bufferAppend(bff, "\x1b[7m", 4);
-    unsigned length = strlen(g_Configuration.statusMessage);
+    int length = strlen(g_Configuration.statusMessage);
+	
     if (length > g_Configuration.screenCols) length = g_Configuration.screenCols;
-    if (length && time(NULL) - g_Configuration.statusMessageTime < 5) {
-	bufferAppend(bff, g_Configuration.statusMessage, length);
-    }
-    
+    if (length && time(NULL) - g_Configuration.statusMessageTime < 5)
+		bufferAppend(bff, g_Configuration.statusMessage, length);
+	
     while (length < g_Configuration.screenCols) {
-	bufferAppend(bff, " ", 1); length++;
-    }
-    
+		bufferAppend(bff, " ", 1); length++;
+	}
     bufferAppend(bff, "\x1b[m", 3);
+	return;
 }
 
 char *prompt(char *prompt, void (*callback)(char *, int)) {
@@ -472,31 +472,30 @@ void findCallback(char *query, int key) {
     if (last_match == -1) direction = 1;
     int current = last_match;
     
-    for (unsigned int i = 0; i < g_Configuration.numberRows; i++) {
-        current += direction;
-	if (current == -1)
-	    current = g_Configuration.numberRows - 1;
-	else if (current == (int)g_Configuration.numberRows)
-	    current = 0;
+    for (int i = 0; i < g_Configuration.numberRows; i++) {
+		current += direction;
+		if (current == -1)
+			current = g_Configuration.numberRows - 1;
+		else if (current == (int)g_Configuration.numberRows)
+			current = 0;
 	
-	ROW *row = &g_Configuration.rows[current];
-	char *match = strstr(row->render, query);
-	if (match) {
-	    last_match = current;
-	    g_Configuration.cursorY = current;
-	    g_Configuration.cursorX = rowRxToCx(row, match - row->render);
-	    
-	    g_Configuration.rowsOff = g_Configuration.numberRows;
-	    break;
+		ROW *row = &g_Configuration.rows[current];
+		char *match = strstr(row->render, query);
+		if (match) {
+			last_match = current;
+			g_Configuration.cursorY = current;
+			g_Configuration.cursorX = rowRxToCx(row, match - row->render);
+			g_Configuration.rowsOff = g_Configuration.numberRows;
+			break;
+		}
 	}
-    }
 }
 
 void find(void) {
-    unsigned int savedColsOff = g_Configuration.colsOff;
-    unsigned int savedRowsOff = g_Configuration.rowsOff;
-    unsigned int savedCursorX = g_Configuration.cursorX;
-    unsigned int savedCursorY = g_Configuration.cursorY;
+    int savedColsOff = g_Configuration.colsOff;
+    int savedRowsOff = g_Configuration.rowsOff;
+    int savedCursorX = g_Configuration.cursorX;
+    int savedCursorY = g_Configuration.cursorY;
     
     char *query = prompt("Search for: %s", findCallback);
     if (query)
@@ -529,7 +528,7 @@ void goto_line(void) {
 	}
 	int number = atoi(input_number);
 	
-	g_Configuration.cursorY = (unsigned int)number;
+	g_Configuration.cursorY = number;
 	setStatusMessage("Cursor placed in %d line.", number);
 	return;
 }
@@ -592,7 +591,7 @@ void drawStatusBar(struct ABUF *bff) {
 	
 	float lines_percentage = 0.0f;
 	if (g_Configuration.numberRows >  0) lines_percentage = (float)g_Configuration.cursorY / g_Configuration.numberRows * 100.0f;
-    unsigned int length = snprintf(status, sizeof(status), "[%.20s] %s (%.1f%%)[line %u/%u][column %u/%u]",
+    int length = snprintf(status, sizeof(status), "[%.20s] %s (%.1f%%)[line %u/%u][column %u/%u]",
 						g_Configuration.filename ? g_Configuration.filename : "New File",
 						g_Configuration.dirty ? "(modified)" : "",
 						lines_percentage,
@@ -600,46 +599,46 @@ void drawStatusBar(struct ABUF *bff) {
 						g_Configuration.cursorX, g_Configuration.screenCols);
     
     if (length > g_Configuration.screenCols)
-	length = g_Configuration.screenCols;
+		length = g_Configuration.screenCols;
     bufferAppend(bff, status, length);
     
     while (length < g_Configuration.screenCols) {
-	bufferAppend(bff, " ", 1); length++;
-    }
+		bufferAppend(bff, " ", 1); length++;
+	}
     bufferAppend(bff, "\r\n", 2);
     bufferAppend(bff, "\x1b[m", 3);
     return;
 }
 
 void drawRows(struct ABUF *bff) {
-    for (unsigned int y = 0; y < g_Configuration.screenRows; y++) {
-	unsigned int fileRow = y + g_Configuration.rowsOff;
-	if (fileRow >= g_Configuration.numberRows) {
-	    if (g_Configuration.numberRows == 0 && y == g_Configuration.screenRows / 2) {
-			char welcomeMessage[80];
-			unsigned int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie, the Text Editor %s", VERSION);
-			if (welcomeLength > g_Configuration.screenCols) welcomeLength = g_Configuration.screenCols;
+    for (int y = 0; y < g_Configuration.screenRows; y++) {
+		int fileRow = y + g_Configuration.rowsOff;
+		if (fileRow >= g_Configuration.numberRows) {
+			if (g_Configuration.numberRows == 0 && y == g_Configuration.screenRows / 2) {
+				char welcomeMessage[80];
+				int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie, the Text Editor %s", VERSION);
+				if (welcomeLength > g_Configuration.screenCols) welcomeLength = g_Configuration.screenCols;
 		
-			int padding = (g_Configuration.screenCols - welcomeLength) / 2;
-			if (padding) {
-		    	bufferAppend(bff, COLUMN_SYMBOL, 1);
-		    	padding--;
+				int padding = (g_Configuration.screenCols - welcomeLength) / 2;
+				if (padding) {
+					bufferAppend(bff, COLUMN_SYMBOL, 1);
+					padding--;
+				}
+				while (padding--) bufferAppend(bff, " ", 1);
+					bufferAppend(bff, welcomeMessage, welcomeLength);
+			} else {
+				bufferAppend(bff, COLUMN_SYMBOL, 1);
 			}
-			while (padding--) bufferAppend(bff, " ", 1);
-				bufferAppend(bff, welcomeMessage, welcomeLength);
-	    } else {
-			bufferAppend(bff, COLUMN_SYMBOL, 1);
-	    }
-	} else {
-	    unsigned int length = g_Configuration.rows[fileRow].rsize - g_Configuration.colsOff;
+		} else {
+			int length = g_Configuration.rows[fileRow].rsize - g_Configuration.colsOff;
 	    
-	    if (length < 0) length = 0;
-	    if (length > g_Configuration.screenCols) length = g_Configuration.screenCols;
-	    
-	    bufferAppend(bff, &g_Configuration.rows[fileRow].render[g_Configuration.colsOff], length);
-	}
-	bufferAppend(bff, "\x1b[K", 3);
-	bufferAppend(bff, "\r\n", 2);
+			if (length < 0) length = 0;
+			if (length > g_Configuration.screenCols) length = g_Configuration.screenCols;
+			
+			bufferAppend(bff, &g_Configuration.rows[fileRow].render[g_Configuration.colsOff], length);
+		}
+		bufferAppend(bff, "\x1b[K", 3);
+		bufferAppend(bff, "\r\n", 2);
     }
 }
 
@@ -722,7 +721,7 @@ void keyPress(void) {
 	    	break;
 		case END:
 	    	row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
-	    	unsigned int rowLength = row ? row->size : 0;
+	    	int rowLength = row ? row->size : 0;
 	    	if (g_Configuration.cursorX < rowLength) g_Configuration.cursorX = rowLength;
 	    	break;
 		
@@ -855,7 +854,7 @@ int readKey(void) {
 }
 
 void insertRow(int at, char *string, size_t length) {
-    if (at < 0 || (unsigned int/*i hate you daniel*/)at > g_Configuration.numberRows) return;
+    if (at < 0 || at > g_Configuration.numberRows) return;
     g_Configuration.rows = realloc(g_Configuration.rows, sizeof(ROW) * (g_Configuration.numberRows + 1));
     memmove(&g_Configuration.rows[at + 1], &g_Configuration.rows[at], sizeof(ROW) * (g_Configuration.numberRows - at));
     
@@ -911,16 +910,13 @@ void editorScroll(void) {
 	if (g_Configuration.cursorX >= g_Configuration.colsOff + g_Configuration.screenCols) {
 		g_Configuration.colsOff = g_Configuration.cursorX - g_Configuration.screenCols + 1;
 	}
-	
-    // if (g_Configuration.renderX < g_Configuration.colsOff) g_Configuration.colsOff = g_Configuration.renderX;
-    // if (g_Configuration.renderX >= g_Configuration.colsOff + g_Configuration.screenCols) g_Configuration.colsOff = g_Configuration.renderX - g_Configuration.screenCols + 1;
     return;
 }
 
 void backup_save(void) {
 	if (g_Configuration.filename == NULL)
 		return;
-	unsigned int length;
+	int length;
 	char *buffer = rowsToString(&length);
 	char *backup_symbol = ".backup";
 	
@@ -954,7 +950,7 @@ void save(void) {
 	    	return;
 		}
     }
-    unsigned int length;
+    int length;
     char *buffer = rowsToString(&length);
     
     int fd = open(g_Configuration.filename, O_RDWR | O_CREAT, 0644);
