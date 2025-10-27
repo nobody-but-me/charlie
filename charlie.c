@@ -569,6 +569,19 @@ void command(void) {
 	else if (strcmp(command, "open") == 0) { file_open(); return; }
 	else if (strcmp(command, "shell") == 0) { shell(); return; }
 	
+	else if (strcmp(command, "refresh-screen") == 0) {
+		g_Configuration.statusMessageTime = 0;
+		setStatusMessage("");
+		
+		if (getWindowSize(&g_Configuration.screenRows,
+						&g_Configuration.screenCols) == -1)
+			error("getWindowSize");
+		g_Configuration.screenRows -= 2;
+		g_Configuration.screenCols -= 2;
+		refreshScreen();
+		return;
+	}
+	
 	setStatusMessage("Command not found.");
 	return;
 }
