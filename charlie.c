@@ -14,6 +14,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 
+#include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -138,7 +139,7 @@ void updateRow(ROW *row);
 
 void editorScroll(void);
 
-void backup_save(void);
+void backupSave(void);
 void save(void);
 
 void editorOpen(const char *file_path);
@@ -148,9 +149,10 @@ void init(void);
 // |-                 Implementation               -|
 // \------------------------|-----------------------/
 
+struct editorConfig g_Configuration; // this capitalized C pisses me off.
+unsigned int g_backupCounter = 0;
 
-struct editorConfig g_Configuration;
-unsigned int backup_timer = 0;
+bool g_doBackups = true;
 
 int rowCxToRx(ROW *row, int cursorX) {
     int newRenderX = 0;
@@ -342,6 +344,8 @@ void insertNewLine(void) {
     }
     g_Configuration.cursorX = 0;
     g_Configuration.cursorY++;
+	if (g_doBackups ==  true)
+		g_backupCounter++;
     return;
 }
 
@@ -351,7 +355,8 @@ void insertChar(int character) {
     rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, character);
     g_Configuration.cursorX++;
     g_Configuration.dirty++;
-	backup_timer++;
+	if (g_doBackups == true)
+		g_backupCounter++;
     return;
 }
 void deleteChar(void) {
@@ -368,7 +373,8 @@ void deleteChar(void) {
 		deleteRow(g_Configuration.cursorY);
 		g_Configuration.cursorY--;
     }
-	backup_timer++;
+	if (g_doBackups == true)
+		g_backupCounter++;
     return;
 }
 
@@ -379,6 +385,8 @@ void deleteRow(int at) {
     memmove(&g_Configuration.rows[at], &g_Configuration.rows[at + 1], sizeof(ROW) * (g_Configuration.numberRows - at - 1));
     g_Configuration.numberRows--;
     g_Configuration.dirty++;
+	if (g_doBackups == true)
+		g_backupCounter++;
     return;
 }
 void freeRow(ROW *row) {
@@ -433,10 +441,10 @@ char *prompt(char *prompt, void (*callback)(char *, int)) {
 	    return NULL;
 	} else if (c == '\r') {
 	    if (buffer_length != 0) {
-		setStatusMessage("");
-		if (callback)
-		     callback(buffer, c);
-		return buffer;
+			setStatusMessage("");
+			if (callback)
+		     	callback(buffer, c);
+			return buffer;
 	    }
 	} else if (!iscntrl(c) && c < 128) {
 	    if (buffer_length == buffer_size - 1) {
@@ -518,6 +526,7 @@ void file_open(void) {
 		return;
 	}
 	init(); editorOpen(file_path);
+	g_backupCounter = 0;
 	refreshScreen();
 	return;
 }
@@ -562,11 +571,12 @@ void command(void) {
 		exit(0);
 		return;
 	}
+	else if (strcmp(command, "backup-mode") == 0) { g_doBackups = !g_doBackups; g_doBackups ? setStatusMessage("Backup-mode enabled") : setStatusMessage("Backup-mode disabled"); return; }
 	else if (strcmp(command, "version") == 0 || strcmp(command, "charlie_version") == 0) { setStatusMessage("Current Charlie Version: %s", VERSION); return; }
 	else if (strcmp(command, "humans-apes?") == 0 || strcmp(command, "humans-apes") == 0) { setStatusMessage("Yes, Miranda. We are all apes."); return; }
 	else if (strcmp(command, "center-screen") == 0) { center_screen(); setStatusMessage("Screen centered."); return; }
 	else if (strcmp(command, "current-line") == 0) { setStatusMessage(" %d ", g_Configuration.cursorY); return; }
-	else if (strcmp(command, "save-backup") == 0) { backup_save(); return; }
+	else if (strcmp(command, "save-backup") == 0) { backupSave(); return; }
 	else if (strcmp(command, "goto-line") == 0) { goto_line(); return; }
 	else if (strcmp(command, "open") == 0) { file_open(); return; }
 	else if (strcmp(command, "shell") == 0) { shell(); return; }
@@ -921,7 +931,7 @@ void editorScroll(void) {
     return;
 }
 
-void backup_save(void) {
+void backupSave(void) {
 	if (g_Configuration.filename == NULL)
 		return;
 	int length;
@@ -939,7 +949,7 @@ void backup_save(void) {
 				close(fd); free(buffer);
 				
 				setStatusMessage("Backup saved successfully");
-				backup_timer = 0;
+				g_backupCounter = 0;
 				return;
 			}
 		}
@@ -1035,9 +1045,9 @@ int main(int argc, char *argv[]) {
 		refreshScreen();
 		keyPress();
 		
-		if (backup_timer >= BACKUP_NECESSARY_CHARACTERS)
-			// that's not the better way to implemenbt this, buddy
-			backup_save();
+		if (g_backupCounter >= BACKUP_NECESSARY_CHARACTERS)
+			// that's likely not the better way to implemenbt this, buddy
+			backupSave();
     }
     return 0;
 }
