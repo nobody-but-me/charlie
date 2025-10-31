@@ -538,9 +538,15 @@ void goto_line(void) {
 		return;
 	}
 	int number = atoi(input_number);
-	
-	g_Configuration.cursorY = number;
-	setStatusMessage("Cursor placed in %d line.", number);
+	if (number < 0)
+		g_Configuration.cursorY = 0;
+	else {
+		if (number < g_Configuration.numberRows)
+			g_Configuration.cursorY = number;
+		else
+			g_Configuration.cursorY = g_Configuration.numberRows;
+	}
+	setStatusMessage("Cursor placed in %d line.", g_Configuration.cursorY);
 	return;
 }
 
@@ -687,21 +693,17 @@ void control(void) {
 		case CTRL_KEY('s'):
 			save();
 			break;
-		case DELETE:
-			deleteRow(g_Configuration.cursorY);
-			if (g_Configuration.cursorX == 0)
+		case DELETE:			
+			if (g_Configuration.cursorX == g_Configuration.rows[g_Configuration.cursorY].size) return;
+			if (g_Configuration.cursorX == 0) {
+				deleteRow(g_Configuration.cursorY);
 				insertRow(g_Configuration.cursorY, "", 0);
-			else {
+				g_Configuration.cursorX = 0;
+			} else {
 				ROW *row = &g_Configuration.rows[g_Configuration.cursorY];
-				
-				insertRow(g_Configuration.cursorY + 1, &row->chars[g_Configuration.cursorX], row->size - g_Configuration.cursorX);
-				row = &g_Configuration.rows[g_Configuration.cursorY];
-				row->size = g_Configuration.cursorX;
-				row->chars[row->size] = '\0';
-				updateRow(row);
+				for (int i = row->size; i > g_Configuration.cursorX - 1; --i)
+					rowDeleteChar(row, i);
 			}
-			g_Configuration.cursorX = 0;
-			//insertNewLine();
 			break;
 	}
 	return;
@@ -766,7 +768,7 @@ void keyPress(void) {
 				}
 			}
 			break;
-	
+		
 		case BACKSPACE:
 	    	deleteChar();
 	    	break;
@@ -1002,12 +1004,14 @@ void editorOpen(const char *file_path) {
     ssize_t length;
     
     while ((length = getline(&line, &capacity, file)) != -1) {
-	while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r'))
-	    length--;
-	insertRow(g_Configuration.numberRows, line, length);
+		while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r'))
+	    	length--;
+		insertRow(g_Configuration.numberRows, line, length);
     }
     
     g_Configuration.dirty = 0;
+	if (g_doBackups)
+		g_backupCounter = 0;
     free(line);
     fclose(file);
     return;
