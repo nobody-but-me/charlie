@@ -36,11 +36,20 @@
 // |-                   Definition                 -|
 // \------------------------|-----------------------/
 
+enum HIGHLIGHTS {
+	HL_NORMAL = 0,
+	HL_INVERTED,
+	HL_NUMBER,
+	HL_MATCH,
+};
+
 typedef struct editorRow {
     char *render;
     char *chars;
     int rsize;
     int size;
+	
+	unsigned char *highlight;
 } ROW;
 
 enum KEYS {
@@ -135,6 +144,8 @@ void keyPress(void);
 int readKey(void);
 
 void insertRow(int at, char *string, size_t length);
+int syntaxToColour(int highlight);
+void updateSyntax(ROW *row);
 void updateRow(ROW *row);
 
 void editorScroll(void);
@@ -194,14 +205,15 @@ char *rowsToString(int *bufferLength) {
 }
 
 int getWindowSize(int *rows, int *cols) {
-    struct winsize window_size;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &window_size) == -1 || window_size.ws_col == 0) {
-		if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
+	struct winsize window_size;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &window_size) == -1 || window_size.ws_col == 0) {
+		if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12)
+			return -1;
 		return getCursorPosition(rows, cols);
-    }
-    *cols = window_size.ws_col;
-    *rows = window_size.ws_row;
-    return 0;
+	}
+	*cols = window_size.ws_col;
+	*rows = window_size.ws_row;
+	return 0;
 }
 
 void error(const char *errorMessage) {
@@ -390,6 +402,7 @@ void deleteRow(int at) {
     return;
 }
 void freeRow(ROW *row) {
+	free(row->highlight);
     free(row->render);
     free(row->chars);
     return;
@@ -462,7 +475,16 @@ char *prompt(char *prompt, void (*callback)(char *, int)) {
 void findCallback(char *query, int key) {
     static int last_match = -1;
     static int direction = 1;
-
+	
+	static char *saved_highlight = NULL;
+	static int saved_highlight_line;
+	
+	if (saved_highlight) {
+		memcpy(g_Configuration.rows[saved_highlight_line].highlight, saved_highlight, g_Configuration.rows[saved_highlight_line].rsize);
+		free(saved_highlight);
+		saved_highlight = NULL;
+	}
+	
     if (key == '\r' || key == '\x1b') {
 		last_match = -1;
 		direction = 1;
@@ -496,6 +518,11 @@ void findCallback(char *query, int key) {
 			g_Configuration.cursorY = current;
 			g_Configuration.cursorX = rowRxToCx(row, match - row->render);
 			g_Configuration.rowsOff = g_Configuration.numberRows;
+			
+			saved_highlight_line = current;
+			saved_highlight = malloc(row->rsize);
+			memcpy(saved_highlight, row->highlight, row->rsize);
+			memset(&row->highlight[match - row->render], HL_MATCH, strlen(query));
 			break;
 		}
 	}
@@ -648,12 +675,35 @@ void drawRows(struct ABUF *bff) {
 			}
 		} else {
 			int length = g_Configuration.rows[fileRow].rsize - g_Configuration.colsOff;
-	    
-			if (length < 0) length = 0;
-			if (length > g_Configuration.screenCols) length = g_Configuration.screenCols;
 			
-			bufferAppend(bff, &g_Configuration.rows[fileRow].render[g_Configuration.colsOff], length);
-		}
+			if (length < 0) length = 0;
+			if (length > g_Configuration.screenCols)
+				length = g_Configuration.screenCols;
+			
+			unsigned char *highlight = &g_Configuration.rows[fileRow].highlight[g_Configuration.colsOff];
+			char *r = &g_Configuration.rows[fileRow].render[g_Configuration.colsOff];
+			int current_colour = -1;
+			for (int i = 0; i < length; i++) {
+				if (highlight[i] == HL_NORMAL) {
+					if (current_colour != -1) {
+						bufferAppend(bff, "\x1b[39m", 5);
+						current_colour = -1;
+					}
+					bufferAppend(bff, &r[i], 1);
+				} else {
+					int colour = syntaxToColour(highlight[i]);
+					if (colour != current_colour) {
+						current_colour = colour;
+						char buffer[16];
+						
+						int clen = snprintf(buffer, sizeof(buffer), "\x1b[%dm", colour);
+						bufferAppend(bff, buffer, clen);
+					}
+					bufferAppend(bff, &r[i], 1);
+				}
+			}
+			bufferAppend(bff, "\x1b[39m", 5);
+	  	}
 		bufferAppend(bff, "\x1b[K", 3);
 		bufferAppend(bff, "\r\n", 2);
     }
@@ -883,37 +933,80 @@ void insertRow(int at, char *string, size_t length) {
     memcpy(g_Configuration.rows[at].chars, string, length);
     g_Configuration.rows[at].chars[length] = '\0';
     
+	g_Configuration.rows[at].highlight = NULL;
+	g_Configuration.rows[at].render = NULL;
     g_Configuration.rows[at].rsize = 0;
-    g_Configuration.rows[at].render = NULL;
+	
     updateRow(&g_Configuration.rows[at]);
     
     g_Configuration.numberRows++;
     g_Configuration.dirty++;
     return;
 }
-void updateRow(ROW *row) {
-    int tabs = 0;
-    
-    for (int i = 0; i < row->size; i++)
-    if (row->chars[i] == '\t')
-        tabs++;
-    free(row->render);
-    
-    row->render = malloc(row->size + tabs * (TAB_STOP - 1) + 1);
-    int index = 0;
-    for (int i = 0; i < row->size; i++) {
-	if (row->chars[i] == '\t') {
-	    row->render[index++] = ' ';
-	    while (index % TAB_STOP != 0)
-	        row->render[index++] = ' ';
-	} else {
-	    row->render[index++] = row->chars[i];
+
+int syntaxToColour(int highlight) {
+	switch (highlight) {
+		case HL_NUMBER:
+			return 31;
+		case HL_MATCH:
+			return 34;
+		default:
+			return 37;
 	}
-    }
-    
-    row->render[index] = '\0';
-    row->rsize = index;
-    return;
+	return -1;
+}
+
+int is_separator(int c) {
+	return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];", c) != NULL;
+}
+void updateSyntax(ROW *row) {
+	row->highlight = realloc(row->highlight, row->rsize);
+	memset(row->highlight, HL_NORMAL, row->rsize);
+
+	int prev_separator = 0;	
+	int i = 0;
+	while (i < row->rsize) {
+		unsigned char prev_highlight = (i > 0) ? row->highlight[i - 1] : HL_NORMAL;
+		char c = row->render[i];
+		
+		if ((isdigit(row->render[i]) && (prev_separator || prev_highlight == HL_NUMBER)) || (c == '.' && prev_highlight == HL_NUMBER)) {
+			row->highlight[i] = HL_NUMBER;
+			prev_separator = 0;
+			i++;
+			
+			continue;
+		}
+		prev_separator = is_separator(c);
+		i++;
+	}
+	return;
+}
+
+void updateRow(ROW *row) {
+	int tabs = 0;
+	
+	for (int i = 0; i < row->size; i++)
+	if (row->chars[i] == '\t')
+		tabs++;
+	free(row->render);
+	
+	row->render = malloc(row->size + tabs * (TAB_STOP - 1) + 1);
+	int index = 0;
+	for (int i = 0; i < row->size; i++) {
+		if (row->chars[i] == '\t') {
+			row->render[index++] = ' ';
+			while (index % TAB_STOP != 0)
+				row->render[index++] = ' ';
+		} else {
+			row->render[index++] = row->chars[i];
+		}
+	}
+	
+	row->render[index] = '\0';
+	row->rsize = index;
+	
+	updateSyntax(row);
+	return;
 }
 
 void editorScroll(void) {
