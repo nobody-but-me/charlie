@@ -32,16 +32,13 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define ABUF_INIT { NULL, 0 }
 
+#define HIGHLIGHT_NUMBERS (1<<0)
+#define HIGHLIGHT_STRINGS (1<<1)
+
 // /------------------------|-----------------------\
 // |-                   Definition                 -|
 // \------------------------|-----------------------/
 
-enum HIGHLIGHTS {
-	HL_NORMAL = 0,
-	HL_INVERTED,
-	HL_NUMBER,
-	HL_MATCH,
-};
 
 typedef struct editorRow {
     char *render;
@@ -51,6 +48,25 @@ typedef struct editorRow {
 	
 	unsigned char *highlight;
 } ROW;
+
+struct langSyntax {
+	char *singleline_comment_start;
+	char **filematch;
+	char **keywords;
+	char *filetype;
+	int flags;
+};
+
+enum HIGHLIGHTS {
+	HL_NORMAL = 0,
+	HL_KEYWORD1,
+	HL_KEYWORD2,
+	HL_INVERTED,
+	HL_COMMENT,
+	HL_STRING,
+	HL_NUMBER,
+	HL_MATCH,
+};
 
 enum KEYS {
     BACKSPACE = 127,
@@ -87,6 +103,8 @@ struct editorConfig {
     
     char *filename;
     ROW *rows;
+	
+	struct langSyntax *syntax;
 };
 
 struct ABUF {
@@ -145,8 +163,10 @@ int readKey(void);
 
 void insertRow(int at, char *string, size_t length);
 int syntaxToColour(int highlight);
+void selectSyntaxHighlight(void);
 void updateSyntax(ROW *row);
-void updateRow(ROW *row);
+int is_separator(int c);
+<void updateRow(ROW *row);
 
 void editorScroll(void);
 
@@ -159,6 +179,22 @@ void init(void);
 // /------------------------|-----------------------\
 // |-                 Implementation               -|
 // \------------------------|-----------------------/
+
+char *g_highlightExtensions[] = { ".c", ".h", ".cc", ".hh", ".cpp", ".hpp", NULL };
+char *g_highlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum", "class",
+								"enum", "case", "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "union", NULL };
+
+struct langSyntax g_highlightDatabase[] = {
+  {
+	"//",
+    g_highlightExtensions,
+	g_highlightKeywords,
+	"C (better language)",
+    HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
+  },
+};
+
+#define HIGHLIGHT_ENTRIES (sizeof(g_highlightDatabase) / sizeof(g_highlightDatabase[0]))
 
 struct editorConfig g_Configuration; // this capitalized C pisses me off.
 unsigned int g_backupCounter = 0;
@@ -631,7 +667,7 @@ void command(void) {
 
 void drawStatusBar(struct ABUF *bff) {
     bufferAppend(bff, "\x1b[7m", 4);
-    char status[80];
+    char status[80], rstatus[80];
 	
 	float lines_percentage = 0.0f;
 	if (g_Configuration.numberRows >  0) lines_percentage = (float)g_Configuration.cursorY / g_Configuration.numberRows * 100.0f;
@@ -641,13 +677,20 @@ void drawStatusBar(struct ABUF *bff) {
 						lines_percentage,
 						g_Configuration.cursorY, g_Configuration.numberRows,
 						g_Configuration.cursorX, g_Configuration.screenCols);
+	int rlength = snprintf(rstatus, sizeof(rstatus), " %s ", g_Configuration.syntax ? g_Configuration.syntax->filetype : "no syntax");
     
     if (length > g_Configuration.screenCols)
 		length = g_Configuration.screenCols;
     bufferAppend(bff, status, length);
     
     while (length < g_Configuration.screenCols) {
-		bufferAppend(bff, " ", 1); length++;
+		if (g_Configuration.screenCols - length == rlength) {
+			bufferAppend(bff, rstatus, rlength);
+			break;
+		} else {
+			bufferAppend(bff, " ", 1);
+			length++;
+		}
 	}
     bufferAppend(bff, "\r\n", 2);
     bufferAppend(bff, "\x1b[m", 3);
@@ -684,7 +727,18 @@ void drawRows(struct ABUF *bff) {
 			char *r = &g_Configuration.rows[fileRow].render[g_Configuration.colsOff];
 			int current_colour = -1;
 			for (int i = 0; i < length; i++) {
-				if (highlight[i] == HL_NORMAL) {
+				if (iscntrl(r[i])) {
+					char sym = (r[i] <= 26) ? '@' + r[i] : '?';
+					bufferAppend(bff, "\x1b[7m", 4);
+					bufferAppend(bff, &sym, 1);
+					bufferAppend(bff, "\x1b[m", 3);
+					if (current_colour != -1) {
+						char buffer[16];
+						int clen = snprintf(buffer, sizeof(buffer), "\x1b[%dm", current_colour);
+						bufferAppend(bff, buffer, clen);
+					}
+				}
+				else if (highlight[i] == HL_NORMAL) {
 					if (current_colour != -1) {
 						bufferAppend(bff, "\x1b[39m", 5);
 						current_colour = -1;
@@ -946,8 +1000,16 @@ void insertRow(int at, char *string, size_t length) {
 
 int syntaxToColour(int highlight) {
 	switch (highlight) {
+		case HL_KEYWORD1:
+			return 33;
+		case HL_KEYWORD2:
+			return 32;
+		case HL_COMMENT:
+			return 90;
 		case HL_NUMBER:
 			return 31;
+		case HL_STRING:
+			return 35;
 		case HL_MATCH:
 			return 34;
 		default:
@@ -956,25 +1018,105 @@ int syntaxToColour(int highlight) {
 	return -1;
 }
 
+void selectSyntaxHighlight(void) {
+	g_Configuration.syntax = NULL;
+	if (g_Configuration.filename == NULL) return;
+	char *ext = strrchr(g_Configuration.filename, '.');
+	for (unsigned int i = 0; i < HIGHLIGHT_ENTRIES; i++) {
+ 		struct langSyntax *string = &g_highlightDatabase[i];
+		unsigned int y = 0;
+		while (string->filematch[y]) {
+			int is_ext = (string->filematch[y][0] == '.');
+			if ((is_ext && ext && !strcmp(ext, string->filematch[y])) ||
+				(!is_ext && strstr(g_Configuration.filename, string->filematch[y]))) {
+				g_Configuration.syntax = string;
+				
+				int fileRow;
+				for (fileRow = 0; fileRow < g_Configuration.numberRows; fileRow++) {
+					updateSyntax(&g_Configuration.rows[fileRow]);
+				}
+				return;
+			}
+			i++;
+		}
+	}
+}
+
 int is_separator(int c) {
 	return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];", c) != NULL;
 }
 void updateSyntax(ROW *row) {
 	row->highlight = realloc(row->highlight, row->rsize);
 	memset(row->highlight, HL_NORMAL, row->rsize);
+	if (g_Configuration.syntax == NULL) return;
+	
+	char **keywords = g_Configuration.syntax->keywords;
+	
+	char *scs = g_Configuration.syntax->singleline_comment_start;
+	int scs_length = scs ? strlen(scs) : 0;
 
 	int prev_separator = 0;	
+	int in_string = 0;
 	int i = 0;
 	while (i < row->rsize) {
 		unsigned char prev_highlight = (i > 0) ? row->highlight[i - 1] : HL_NORMAL;
 		char c = row->render[i];
 		
-		if ((isdigit(row->render[i]) && (prev_separator || prev_highlight == HL_NUMBER)) || (c == '.' && prev_highlight == HL_NUMBER)) {
-			row->highlight[i] = HL_NUMBER;
-			prev_separator = 0;
-			i++;
+		if (scs_length && !in_string) {
+			if (!strncmp(&row->render[i], scs, scs_length)) {
+				memset(&row->highlight[i], HL_COMMENT, row->rsize - i);
+				break;
+			}
+		}
+		if (g_Configuration.syntax->flags & HIGHLIGHT_STRINGS) {
+			if (in_string) {
+				row->highlight[i] = HL_STRING;
+				if (c == '\\' && i + 1 < row->rsize) {
+					row->highlight[i + 1] = HL_STRING;
+					i += 2;
+					continue;
+				}
+				if (c == in_string)
+					in_string = 0;
+				prev_separator = 1;
+				i++;
+				continue;
+			} else {
+				if (c == '"' || c == '\'') {
+					in_string = c;
+					
+					row->highlight[i] = HL_STRING; i++;
+					continue;
+				}
+			}
+		}
+		if (g_Configuration.syntax->flags & HIGHLIGHT_NUMBERS) {
+			if ((isdigit(row->render[i]) && (prev_separator || prev_highlight == HL_NUMBER)) || (c == '.' && prev_highlight == HL_NUMBER)) {
+				row->highlight[i] = HL_NUMBER;
+				prev_separator = 0;
+				i++;
 			
-			continue;
+				continue;
+			}
+		}
+		if (prev_separator) {
+			int j;
+			for (j = 0; keywords[j]; j++) {
+				int klen = strlen(keywords[j]);
+				int kw2 = keywords[j][klen - 1] == '|';
+				if (kw2) klen--;
+				
+				if (!strncmp(&row->render[i], keywords[j], klen) &&
+					is_separator(row->render[i + klen])) {
+					memset(&row->highlight[i], kw2 ? HL_KEYWORD2 : HL_KEYWORD1, klen);
+					i += klen;
+					break;
+				}
+			}
+			if (keywords[j] != NULL) {
+				prev_separator = 0;
+				continue;
+			}
 		}
 		prev_separator = is_separator(c);
 		i++;
@@ -1062,6 +1204,7 @@ void save(void) {
 	    	setStatusMessage("Saving process aborted.");
 	    	return;
 		}
+		selectSyntaxHighlight();
     }
     int length;
     char *buffer = rowsToString(&length);
@@ -1088,10 +1231,13 @@ void save(void) {
 
 void editorOpen(const char *file_path) {
     free(g_Configuration.filename); g_Configuration.filename = strdup(file_path);
+	g_Configuration.filename = strdup(file_path);
+	selectSyntaxHighlight();
+	
     FILE *file = fopen(file_path, "r");
     if (!file)
         error("fopen");
-    
+
     size_t capacity = 0;
     char *line = NULL;
     ssize_t length;
@@ -1124,6 +1270,7 @@ void init(void) {
     g_Configuration.dirty = 0;
 
     g_Configuration.filename = NULL;
+	g_Configuration.syntax = NULL;
     
     if (getWindowSize(&g_Configuration.screenRows, &g_Configuration.screenCols) == -1)
         error("getWindowSize");
