@@ -25,7 +25,7 @@
 
 #define BACKUP_NECESSARY_CHARACTERS 350
 #define COLUMN_SYMBOL "."
-#define VERSION "0.0.3"
+#define VERSION "0.0.4"
 #define QUIT_TIMES 1
 #define TAB_STOP 4
 
@@ -166,7 +166,7 @@ int syntaxToColour(int highlight);
 void selectSyntaxHighlight(void);
 void updateSyntax(ROW *row);
 int is_separator(int c);
-<void updateRow(ROW *row);
+void updateRow(ROW *row);
 
 void editorScroll(void);
 
@@ -185,13 +185,20 @@ char *g_highlightKeywords[] = { "switch", "if", "else", "for", "continue", "brea
 								"enum", "case", "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "union", NULL };
 
 struct langSyntax g_highlightDatabase[] = {
-  {
-	"//",
-    g_highlightExtensions,
-	g_highlightKeywords,
-	"C (better language)",
-    HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
-  },
+	{
+		"//",
+		g_highlightExtensions,
+		g_highlightKeywords,
+		"C (better language)",
+		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
+	},
+	{
+		"//",
+		g_highlightExtensions,
+		g_highlightKeywords,
+		"C++ (good, but not better than C)",
+		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
+	}
 };
 
 #define HIGHLIGHT_ENTRIES (sizeof(g_highlightDatabase) / sizeof(g_highlightDatabase[0]))
@@ -703,7 +710,7 @@ void drawRows(struct ABUF *bff) {
 		if (fileRow >= g_Configuration.numberRows) {
 			if (g_Configuration.numberRows == 0 && y == g_Configuration.screenRows / 2) {
 				char welcomeMessage[80];
-				int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie, the Text Editor %s", VERSION);
+				int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie, the worst Text Editor %s", VERSION);
 				if (welcomeLength > g_Configuration.screenCols) welcomeLength = g_Configuration.screenCols;
 		
 				int padding = (g_Configuration.screenCols - welcomeLength) / 2;
@@ -1021,23 +1028,22 @@ int syntaxToColour(int highlight) {
 void selectSyntaxHighlight(void) {
 	g_Configuration.syntax = NULL;
 	if (g_Configuration.filename == NULL) return;
-	char *ext = strrchr(g_Configuration.filename, '.');
+	char *ext = strrchr(g_Configuration.filename, '.');	
 	for (unsigned int i = 0; i < HIGHLIGHT_ENTRIES; i++) {
- 		struct langSyntax *string = &g_highlightDatabase[i];
+		struct langSyntax *syntax =  &g_highlightDatabase[i];
 		unsigned int y = 0;
-		while (string->filematch[y]) {
-			int is_ext = (string->filematch[y][0] == '.');
-			if ((is_ext && ext && !strcmp(ext, string->filematch[y])) ||
-				(!is_ext && strstr(g_Configuration.filename, string->filematch[y]))) {
-				g_Configuration.syntax = string;
-				
+		while (syntax->filematch[y]) {
+			int is_extension = (syntax->filematch[y][0] == '.');
+			if ((is_extension && ext && !strcmp(ext, syntax->filematch[y])) ||
+				(!is_extension && strstr(g_Configuration.filename, syntax->filematch[y]))) {
+				g_Configuration.syntax = syntax;
 				int fileRow;
 				for (fileRow = 0; fileRow < g_Configuration.numberRows; fileRow++) {
 					updateSyntax(&g_Configuration.rows[fileRow]);
 				}
 				return;
 			}
-			i++;
+			y++;
 		}
 	}
 }
@@ -1049,19 +1055,15 @@ void updateSyntax(ROW *row) {
 	row->highlight = realloc(row->highlight, row->rsize);
 	memset(row->highlight, HL_NORMAL, row->rsize);
 	if (g_Configuration.syntax == NULL) return;
-	
 	char **keywords = g_Configuration.syntax->keywords;
-	
 	char *scs = g_Configuration.syntax->singleline_comment_start;
 	int scs_length = scs ? strlen(scs) : 0;
-
-	int prev_separator = 0;	
-	int in_string = 0;
+	int prev_sep = 1; int in_string = 0;
 	int i = 0;
+	
 	while (i < row->rsize) {
-		unsigned char prev_highlight = (i > 0) ? row->highlight[i - 1] : HL_NORMAL;
 		char c = row->render[i];
-		
+		unsigned char prev_highlight = (i > 0) ? row->highlight[i - 1] : HL_NORMAL;
 		if (scs_length && !in_string) {
 			if (!strncmp(&row->render[i], scs, scs_length)) {
 				memset(&row->highlight[i], HL_COMMENT, row->rsize - i);
@@ -1076,52 +1078,47 @@ void updateSyntax(ROW *row) {
 					i += 2;
 					continue;
 				}
-				if (c == in_string)
-					in_string = 0;
-				prev_separator = 1;
+				if (c == in_string) in_string = 0;
+				prev_sep = 1;
 				i++;
 				continue;
 			} else {
 				if (c == '"' || c == '\'') {
+          			row->highlight[i] = HL_STRING;
 					in_string = c;
-					
-					row->highlight[i] = HL_STRING; i++;
+					i++;
 					continue;
 				}
 			}
 		}
 		if (g_Configuration.syntax->flags & HIGHLIGHT_NUMBERS) {
-			if ((isdigit(row->render[i]) && (prev_separator || prev_highlight == HL_NUMBER)) || (c == '.' && prev_highlight == HL_NUMBER)) {
+			if ((isdigit(c) && (prev_sep || prev_highlight == HL_NUMBER)) || (c == '.' && prev_highlight == HL_NUMBER)) {
 				row->highlight[i] = HL_NUMBER;
-				prev_separator = 0;
+				prev_sep = 0;
 				i++;
-			
 				continue;
 			}
 		}
-		if (prev_separator) {
+		if (prev_sep) {
 			int j;
 			for (j = 0; keywords[j]; j++) {
 				int klen = strlen(keywords[j]);
 				int kw2 = keywords[j][klen - 1] == '|';
 				if (kw2) klen--;
-				
-				if (!strncmp(&row->render[i], keywords[j], klen) &&
-					is_separator(row->render[i + klen])) {
+				if (!strncmp(&row->render[i], keywords[j], klen) && is_separator(row->render[i + klen])) {
 					memset(&row->highlight[i], kw2 ? HL_KEYWORD2 : HL_KEYWORD1, klen);
 					i += klen;
 					break;
 				}
 			}
 			if (keywords[j] != NULL) {
-				prev_separator = 0;
+				prev_sep = 0;
 				continue;
 			}
 		}
-		prev_separator = is_separator(c);
+		prev_sep = is_separator(c);
 		i++;
 	}
-	return;
 }
 
 void updateRow(ROW *row) {
