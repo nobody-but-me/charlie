@@ -181,8 +181,8 @@ void init(void);
 // \------------------------|-----------------------/
 
 char *g_highlightExtensions[] = { ".c", ".h", ".cc", ".hh", ".cpp", ".hpp", NULL };
-char *g_highlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum", "class",
-								"enum", "case", "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "union", NULL };
+char *g_highlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum", "class", "NULL", "return", "#include",
+								"enum", "case", "const", "#define|", "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "union", NULL };
 
 struct langSyntax g_highlightDatabase[] = {
 	{
@@ -192,13 +192,6 @@ struct langSyntax g_highlightDatabase[] = {
 		"C (better language)",
 		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
 	},
-	{
-		"//",
-		g_highlightExtensions,
-		g_highlightKeywords,
-		"C++ (good, but not better than C)",
-		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
-	}
 };
 
 #define HIGHLIGHT_ENTRIES (sizeof(g_highlightDatabase) / sizeof(g_highlightDatabase[0]))
