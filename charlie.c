@@ -181,8 +181,11 @@ void init(void);
 // \------------------------|-----------------------/
 
 char *g_highlightExtensions[] = { ".c", ".h", ".cc", ".hh", ".cpp", ".hpp", NULL };
-char *g_highlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum", "class", "NULL", "return", "#include",
-								"enum", "case", "const", "#define|", "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "union", NULL };
+char *g_highlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
+								"class", "NULL", "return", "#include", "enum", "case", "false", "once", "const", "union", "namespace"
+								
+								"true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
+								"double|", "float|", "char|", "unsigned|", "signed|", "void|", NULL };
 
 struct langSyntax g_highlightDatabase[] = {
 	{
@@ -1001,9 +1004,9 @@ void insertRow(int at, char *string, size_t length) {
 int syntaxToColour(int highlight) {
 	switch (highlight) {
 		case HL_KEYWORD1:
-			return 33;
+			return 35;
 		case HL_KEYWORD2:
-			return 32;
+			return 34;
 		case HL_COMMENT:
 			return 90;
 		case HL_NUMBER:
