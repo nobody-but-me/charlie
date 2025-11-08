@@ -23,6 +23,15 @@ As I wrote some lines above, the project is highly inspired by kilo, which means
 
 and follow the instructions.
 
+# TODO
+
+ - [ ] Line numbers;
+ - [ ] UTF8 support;
+ - [ ] Bigger status messages;
+ - [ ] Command history;
+ - [ ] Emacs IDO-mode-like command bar;
+ - [ ] .
+
 # Other
 
 If anyone's curious: I am using the "feminine version" of Charlie name.

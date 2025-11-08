@@ -24,8 +24,8 @@
 #include <errno.h>
 
 #define BACKUP_NECESSARY_CHARACTERS 350
-#define COLUMN_SYMBOL "."
-#define VERSION "0.0.4"
+#define COLUMN_SYMBOL ""
+#define VERSION "0.0.5"
 #define QUIT_TIMES 1
 #define TAB_STOP 4
 
@@ -685,7 +685,7 @@ void drawStatusBar(struct ABUF *bff) {
 	
 	float lines_percentage = 0.0f;
 	if (g_Configuration.numberRows >  0) lines_percentage = (float)g_Configuration.cursorY / g_Configuration.numberRows * 100.0f;
-    int length = snprintf(status, sizeof(status), "[%.20s] %s (%.1f%%)[line %u/%u][column %u/%u]",
+    int length = snprintf(status, sizeof(status), "[%.50s] %s (%.1f%%)[line %u/%u][column %u/%u]",
 						g_Configuration.filename ? g_Configuration.filename : "New File",
 						g_Configuration.dirty ? "(modified)" : "",
 						lines_percentage,
@@ -717,18 +717,18 @@ void drawRows(struct ABUF *bff) {
 		if (fileRow >= g_Configuration.numberRows) {
 			if (g_Configuration.numberRows == 0 && y == g_Configuration.screenRows / 2) {
 				char welcomeMessage[80];
-				int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie, the worst Text Editor %s", VERSION);
+				int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie %s, the worst text editor ever", VERSION);
 				if (welcomeLength > g_Configuration.screenCols) welcomeLength = g_Configuration.screenCols;
-		
+				
 				int padding = (g_Configuration.screenCols - welcomeLength) / 2;
 				if (padding) {
 					bufferAppend(bff, COLUMN_SYMBOL, 1);
 					padding--;
 				}
 				while (padding--) bufferAppend(bff, " ", 1);
-					bufferAppend(bff, welcomeMessage, welcomeLength);
+				bufferAppend(bff, welcomeMessage, welcomeLength);
 			} else {
-				bufferAppend(bff, COLUMN_SYMBOL, 1);
+				bufferAppend(bff, COLUMN_SYMBOL, 1); // this became an apendice
 			}
 		} else {
 			int length = g_Configuration.rows[fileRow].rsize - g_Configuration.colsOff;
@@ -1221,7 +1221,7 @@ void save(void) {
 		close(fd);
 		free(buffer);
 		
-		setStatusMessage("%s file saved! [%d bytes written to disk]", g_Configuration.filename, length);
+		setStatusMessage("%s saved! [%d bytes written to disk]", g_Configuration.filename, length);
 		g_Configuration.dirty = 0;
 		return;
 	    }
