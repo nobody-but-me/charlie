@@ -180,9 +180,13 @@ void init(void);
 // |-                 Implementation               -|
 // \------------------------|-----------------------/
 
-char *g_highlightExtensions[] = { ".c", ".h", ".cc", ".hh", ".cpp", ".hpp", NULL };
-char *g_highlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
-								"class", "NULL", "return", "#include", "enum", "case", "false", "once", "const", "union", "namespace"
+char *g_cppExtensions[] = { ".cpp", ".hpp", ".cc", ".hh", NULL };
+char *g_cExtensions[] = { ".c", ".h", NULL };
+
+//
+char *g_CshighlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
+								"class", "NULL", "return", "#include", "enum", "case", "false", "once", "const", "union","namespace",
+								"volatile",
 								
 								"true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
 								"double|", "float|", "char|", "unsigned|", "signed|", "void|", NULL };
@@ -190,11 +194,18 @@ char *g_highlightKeywords[] = { "switch", "if", "else", "for", "continue", "brea
 struct langSyntax g_highlightDatabase[] = {
 	{
 		"//",
-		g_highlightExtensions,
-		g_highlightKeywords,
-		"C (better language)",
+		g_cExtensions,
+		g_CshighlightKeywords,
+		"| C |",
 		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
 	},
+	{
+		"//",
+		g_cppExtensions,
+		g_CshighlightKeywords,
+		"| C++ |",
+		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
+	}
 };
 
 #define HIGHLIGHT_ENTRIES (sizeof(g_highlightDatabase) / sizeof(g_highlightDatabase[0]))
@@ -591,7 +602,7 @@ void file_open(void) {
 		setStatusMessage("Opening file operation aborted.");
 		return;
 	}
-	init(); editorOpen(file_path);
+	editorOpen(file_path);
 	g_backupCounter = 0;
 	refreshScreen();
 	return;
@@ -1222,14 +1233,17 @@ void save(void) {
     return;
 }
 
-void editorOpen(const char *file_path) {
-    free(g_Configuration.filename); g_Configuration.filename = strdup(file_path);
+void editorOpen(const char *file_path) {	
+    FILE *file = fopen(file_path, "r");
+    if (!file) {
+		setStatusMessage("File not found");
+		return;
+	}
+	init();
+	
+	free(g_Configuration.filename); g_Configuration.filename = strdup(file_path);
 	g_Configuration.filename = strdup(file_path);
 	selectSyntaxHighlight();
-	
-    FILE *file = fopen(file_path, "r");
-    if (!file)
-        error("fopen");
 
     size_t capacity = 0;
     char *line = NULL;
