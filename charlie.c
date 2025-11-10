@@ -184,25 +184,33 @@ char *g_cppExtensions[] = { ".cpp", ".hpp", ".cc", ".hh", NULL };
 char *g_cExtensions[] = { ".c", ".h", NULL };
 
 //
-char *g_CshighlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
-								"class", "NULL", "return", "#include", "enum", "case", "false", "once", "const", "union","namespace",
-								"volatile",
+char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
+								"NULL", "return", "#include", "case", "false", "const", "union", "volatile",
 								
-								"true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
-								"double|", "float|", "char|", "unsigned|", "signed|", "void|", NULL };
+								"true|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
+								"#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
+							   };
+
+char *g_CppHighlightKeywords[] = {"switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
+								  "class", "NULL", "return", "#include", "case", "false", "once", "const", "union", "namespace",
+								  "volatile", "constexpr", "static_cast", "dynamic_cast", "const_cast", "using",
+								
+								  "true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
+								  "#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
+								};
 
 struct langSyntax g_highlightDatabase[] = {
 	{
 		"//",
 		g_cExtensions,
-		g_CshighlightKeywords,
+		g_ChighlightKeywords,
 		"| C |",
 		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
 	},
 	{
 		"//",
 		g_cppExtensions,
-		g_CshighlightKeywords,
+		g_CppHighlightKeywords,
 		"| C++ |",
 		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
 	}
