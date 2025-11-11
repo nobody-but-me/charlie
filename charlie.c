@@ -183,7 +183,7 @@ void init(void);
 char *g_cppExtensions[] = { ".cpp", ".hpp", ".cc", ".hh", NULL };
 char *g_cExtensions[] = { ".c", ".h", NULL };
 
-//
+// NOTE: it would be interesting to separate it in a different file or something.
 char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
 								"NULL", "return", "#include", "case", "false", "const", "union", "volatile",
 								
