@@ -187,7 +187,7 @@ char *g_cExtensions[] = { ".c", ".h", NULL };
 char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
 								"NULL", "return", "#include", "case", "false", "const", "union", "volatile",
 								
-								"true|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
+								"true|", "bool|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
 								"#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
 							   };
 
@@ -196,7 +196,7 @@ char *g_CppHighlightKeywords[] = {"switch", "if", "else", "for", "continue", "br
 								  "volatile", "constexpr", "static_cast", "dynamic_cast", "const_cast", "using",
 								
 								  "true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
-								  "#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
+								  "#ifdef|", "bool|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
 								};
 
 struct langSyntax g_highlightDatabase[] = {
@@ -699,7 +699,7 @@ void drawStatusBar(struct ABUF *bff) {
 						lines_percentage,
 						g_Configuration.cursorY, g_Configuration.numberRows,
 						g_Configuration.cursorX, g_Configuration.screenCols);
-	int rlength = snprintf(rstatus, sizeof(rstatus), " %s ", g_Configuration.syntax ? g_Configuration.syntax->filetype : "no syntax");
+	int rlength = snprintf(rstatus, sizeof(rstatus), "%s", g_Configuration.syntax ? g_Configuration.syntax->filetype : "no syntax");
     
     if (length > g_Configuration.screenCols)
 		length = g_Configuration.screenCols;
