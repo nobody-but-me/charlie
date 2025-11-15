@@ -185,7 +185,7 @@ char *g_cExtensions[] = { ".c", ".h", NULL };
 
 // NOTE: it would be interesting to separate it in a different file or something.
 char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
-								"NULL", "return", "#include", "case", "false", "const", "union", "volatile",
+								"NULL", "return", "#include", "case", "false", "const", "union", "volatile", "goto",
 								
 								"true|", "bool|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
 								"#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
@@ -193,7 +193,7 @@ char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "bre
 
 char *g_CppHighlightKeywords[] = {"switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
 								  "class", "NULL", "return", "#include", "case", "false", "once", "const", "union", "namespace",
-								  "volatile", "constexpr", "static_cast", "dynamic_cast", "const_cast", "using",
+								  "volatile", "constexpr", "static_cast", "dynamic_cast", "const_cast", "using", "goto",
 								
 								  "true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
 								  "#ifdef|", "bool|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
