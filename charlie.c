@@ -57,6 +57,15 @@ struct langSyntax {
 	int flags;
 };
 
+enum PROMPT_COMMANDS {
+	PC_OPEN = 0,
+	PC_COMMAND,
+	PC_SEARCH,
+	PC_GOTO,
+	PC_SAVE,
+	PC_SHELL,
+};
+
 enum HIGHLIGHTS {
 	HL_NORMAL = 0,
 	HL_KEYWORD1,
@@ -146,7 +155,7 @@ void drawStatusMessage(struct ABUF *bff);
 
 void center_screen(void);
 
-char *prompt(char *prompt, void (*callback)(char *, int));
+char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int));
 void file_open(void);
 void command(void);
 void find(void);
@@ -185,7 +194,7 @@ char *g_cExtensions[] = { ".c", ".h", NULL };
 
 // NOTE: it would be interesting to separate it in a different file or something.
 char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
-								"NULL", "return", "#include", "case", "false", "const", "union", "volatile", "goto",
+								"NULL", "return", "#include", "case", "false", "const", "union", "volatile", "goto", "default:", "default"
 								
 								"true|", "bool|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
 								"#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
@@ -193,8 +202,9 @@ char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "bre
 
 char *g_CppHighlightKeywords[] = {"switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
 								  "class", "NULL", "return", "#include", "case", "false", "once", "const", "union", "namespace",
-								  "volatile", "constexpr", "static_cast", "dynamic_cast", "const_cast", "using", "goto",
-								
+								  "volatile", "constexpr", "static_cast", "dynamic_cast", "const_cast", "using", "goto", "default",
+								  "default",
+								 
 								  "true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
 								  "#ifdef|", "bool|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
 								};
@@ -489,45 +499,88 @@ void drawStatusMessage(struct ABUF *bff) {
 	return;
 }
 
-char *prompt(char *prompt, void (*callback)(char *, int)) {
-    size_t buffer_size = 128;
-    char *buffer = malloc(buffer_size);
-    
-    size_t buffer_length = 0;
-    buffer[0] = '\0';
+char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int)) {
+	size_t buffer_size;
+    size_t buffer_length;
+	char *buffer = NULL;
+	switch (prompt_type) {
+		case PC_OPEN:
+			buffer_length = 0;
+			buffer_size = 0;
+			
+			if (g_Configuration.filename != NULL) {
+				size_t filename_length = strlen(g_Configuration.filename);
+				buffer_size = filename_length + 1;
+				
+				buffer = (char*)malloc(buffer_size + 1);
+				if (buffer == NULL) {
+					setStatusMessage("failed to malloc memory to prompt's string buffer.");
+					return NULL;
+				}
+				buffer[buffer_size] = '\0';
+				snprintf(buffer, buffer_size, "%s",  g_Configuration.filename);
+				buffer_length = buffer_size - 1;
+			} else {
+				buffer_size = 128; buffer_length = 0;
+				buffer = (char*)malloc(buffer_size);
+				if (buffer == NULL) {
+					setStatusMessage("failed to malloc memory to prompt's string buffer");
+					return NULL;
+				}
+				buffer[0] = '\0';
+				break;
+			}
+			break;
+		default:
+			buffer_size = 128; buffer_length = 0;
+			buffer = (char*)malloc(buffer_size);
+			if (buffer == NULL) {
+				setStatusMessage("failedd to malloc memory to prompt's string buffer.");
+				return NULL;
+			}
+			buffer[0] = '\0';
+			break;
+	}
+	
+//	char *buffer = (char*)malloc(buffer_size + 1);
+//	if (buffer == NULL) {
+//		setStatusMessage("failed to malloc memory to prompt's string buffer.");
+//		return NULL;
+//	}
+//  buffer[buffer_size] = '\0';
 
     while(1) {
-	setStatusMessage(prompt, buffer);
-	refreshScreen();
-	
-	int c = readKey();
-	if (c == BACKSPACE) {
-	    if (buffer_length != 0)
-		buffer[--buffer_length] = '\0';
-	} else if (c == '\x1b') {
-	    setStatusMessage("");
-	    if (callback)
-		callback(buffer, c);
-	    free(buffer);
-	    return NULL;
-	} else if (c == '\r') {
-	    if (buffer_length != 0) {
+		setStatusMessage(prompt, buffer);
+		refreshScreen();
+		
+		int c = readKey();
+		if (c == BACKSPACE) {
+			if (buffer_length != 0)
+				buffer[--buffer_length] = '\0';
+		} else if (c == '\x1b') {
 			setStatusMessage("");
 			if (callback)
-		     	callback(buffer, c);
-			return buffer;
-	    }
-	} else if (!iscntrl(c) && c < 128) {
-	    if (buffer_length == buffer_size - 1) {
-		buffer_size *= 2;
-		buffer = realloc(buffer, buffer_size);
-	    }
-	    buffer[buffer_length++] = c;
-	    buffer[buffer_length] = '\0';
-	}
+				callback(buffer, c);
+			free(buffer);
+			return NULL;
+		} else if (c == '\r') {
+			if (buffer_length != 0) {
+				setStatusMessage("");
+				if (callback)
+					callback(buffer, c);
+				return buffer;
+			}
+		} else if (!iscntrl(c) && c < 128) {
+			if (buffer_length == buffer_size - 1) {
+				buffer_size *= 2;
+				buffer = realloc(buffer, buffer_size);
+			}
+			buffer[buffer_length++] = c;
+			buffer[buffer_length] = '\0';
+		}
 	if (callback)
-	    callback(buffer, c);
-    }
+		callback(buffer, c);
+	}
 }
 
 void findCallback(char *query, int key) {
@@ -592,7 +645,7 @@ void find(void) {
     int savedCursorX = g_Configuration.cursorX;
     int savedCursorY = g_Configuration.cursorY;
     
-    char *query = prompt("Search for: %s", findCallback);
+    char *query = prompt("Search for: %s", PC_SEARCH, findCallback);
     if (query)
 		free(query);
     else {
@@ -605,7 +658,7 @@ void find(void) {
 }
 
 void file_open(void) {
-	char *file_path = prompt("Open file at: %s", NULL);
+	char *file_path = prompt("Open file at: %s", PC_OPEN, NULL);
 	if (file_path == NULL) {
 		setStatusMessage("Opening file operation aborted.");
 		return;
@@ -617,7 +670,7 @@ void file_open(void) {
 }
 
 void goto_line(void) {
-	char *input_number = prompt("Go to line: %s", NULL);
+	char *input_number = prompt("Go to line: %s", PC_GOTO, NULL);
 	if (input_number == NULL) {
 		setStatusMessage("Goto-line operation aborted.");
 		return;
@@ -636,7 +689,7 @@ void goto_line(void) {
 }
 
 void shell(void) {
-	char *shell_command = prompt("Shell command: %s", NULL);
+	char *shell_command = prompt("Shell command: %s", PC_SHELL, NULL);
 	if (shell_command == NULL) {
 		setStatusMessage("Shell command operation aborted.");
 		return;
@@ -650,7 +703,7 @@ void shell(void) {
 }
 
 void command(void) {
-	char *command = prompt("Exec. command: %s", NULL);
+	char *command = prompt("Exec. command: %s", PC_COMMAND, NULL);
 	if (command == NULL) {
 		setStatusMessage("Exec. of command aborted.");
 		return;
@@ -1211,7 +1264,7 @@ void backupSave(void) {
 }
 void save(void) {
     if (g_Configuration.filename == NULL) {
-		g_Configuration.filename = prompt("Save new file as: %s", NULL);
+		g_Configuration.filename = prompt("Save new file as: %s", PC_SAVE, NULL);
 		if (g_Configuration.filename == NULL) {
 	    	setStatusMessage("Saving process aborted.");
 	    	return;
