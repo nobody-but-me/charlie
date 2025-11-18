@@ -23,9 +23,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define BACKUP_NECESSARY_CHARACTERS 350
+#define BACKUP_NECESSARY_CHARACTERS 512
 #define COLUMN_SYMBOL ""
-#define VERSION "0.0.5"
+#define VERSION "0.0.6"
 #define QUIT_TIMES 1
 #define TAB_STOP 4
 
@@ -70,6 +70,7 @@ enum HIGHLIGHTS {
 	HL_NORMAL = 0,
 	HL_KEYWORD1,
 	HL_KEYWORD2,
+	HL_KEYWORD3,
 	HL_INVERTED,
 	HL_COMMENT,
 	HL_STRING,
@@ -113,6 +114,9 @@ struct editorConfig {
     char *filename;
     ROW *rows;
 	
+	int markX;
+	int markY;
+	
 	struct langSyntax *syntax;
 };
 
@@ -141,6 +145,8 @@ void enableRawMode(void);
 void rowAppendString(ROW *row, char *string, size_t length);
 void rowInsertChar(ROW *row, int at, int character);
 void rowDeleteChar(ROW *row, int at);
+
+void insertMark(void);
 
 void insertNewLine(void);
 
@@ -194,19 +200,24 @@ char *g_cExtensions[] = { ".c", ".h", NULL };
 
 // NOTE: it would be interesting to separate it in a different file or something.
 char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
-								"NULL", "return", "#include", "case", "false", "const", "union", "volatile", "goto", "default:", "default"
+								"NULL", "return", "#include", "case", "false", "union", "volatile", "goto", "default",
 								
 								"true|", "bool|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
-								"#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
+								"#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", 
+								
+								"const/",
+								NULL
 							   };
 
 char *g_CppHighlightKeywords[] = {"switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
-								  "class", "NULL", "return", "#include", "case", "false", "once", "const", "union", "namespace",
-								  "volatile", "constexpr", "static_cast", "dynamic_cast", "const_cast", "using", "goto", "default",
-								  "default",
+								  "class", "NULL", "return", "#include", "case", "false", "once", "union", "namespace", "volatile",
+								  "constexpr", "static_cast", "dynamic_cast", "const_cast", "using", "goto", "default",
 								 
 								  "true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
-								  "#ifdef|", "bool|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", NULL
+								  "#ifdef|", "bool|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|",
+								  
+								  "const/",
+								  NULL
 								};
 
 struct langSyntax g_highlightDatabase[] = {
@@ -403,11 +414,17 @@ void rowInsertChar(ROW *row, int at, int character) {
     return;
 }
 void rowDeleteChar(ROW *row, int at) {
-    if (at < 0 || at >= row->size) return;
-    memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
-    row->size--;
+	if (at < 0 || at >= row->size) return;
+	memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
+	row->size--;
     
-    updateRow(row);
+	updateRow(row);
+}
+
+void insertMark(void) {
+	g_Configuration.markX = g_Configuration.cursorX;
+	g_Configuration.markY = g_Configuration.cursorY;
+	return;
 }
 
 void insertNewLine(void) {
@@ -509,7 +526,26 @@ char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int)) {
 			buffer_size = 0;
 			
 			if (g_Configuration.filename != NULL) {
-				size_t filename_length = strlen(g_Configuration.filename);
+//				char *final_buffer = (char*)malloc(strlen(g_Configuration.filename) + 1);
+//				if (final_buffer == NULL) break;
+//				snprintf(final_buffer, strlen(g_Configuration.filename) + 1, "%s", g_Configuration.filename);
+//				
+//				int pos = strlen(final_buffer) - 1;
+//				while (final_buffer[pos] != '/' && pos > 0) {
+//					rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorY, final_buffer[pos]);
+//					final_buffer[pos - 1] = '\0';
+//					--pos;
+//				}
+//				
+//				final_buffer = (char*)malloc(strlen(g_Configuration.filename));
+//				strcat(final_buffer, g_Configuration.filename);
+//				int poss = strlen(g_Configuration.filename) - 1; if (poss < 0) break;
+//				while (poss > (int)(strlen(g_Configuration.filename) - strlen(isolated_filename))) {
+//					memmove(&final_buffer[poss], &final_buffer[poss + 1], strlen(g_Configuration.filename) - poss);
+//					--poss;
+//				}
+				
+				size_t filename_length = strlen(g_Configuration.filename);//strlen(g_Configuration.filename) - strlen(isolated_filename);
 				buffer_size = filename_length + 1;
 				
 				buffer = (char*)malloc(buffer_size + 1);
@@ -518,7 +554,7 @@ char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int)) {
 					return NULL;
 				}
 				buffer[buffer_size] = '\0';
-				snprintf(buffer, buffer_size, "%s",  g_Configuration.filename);
+				snprintf(buffer, buffer_size, "%s", g_Configuration.filename);
 				buffer_length = buffer_size - 1;
 			} else {
 				buffer_size = 128; buffer_length = 0;
@@ -541,13 +577,6 @@ char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int)) {
 			buffer[0] = '\0';
 			break;
 	}
-	
-//	char *buffer = (char*)malloc(buffer_size + 1);
-//	if (buffer == NULL) {
-//		setStatusMessage("failed to malloc memory to prompt's string buffer.");
-//		return NULL;
-//	}
-//  buffer[buffer_size] = '\0';
 
     while(1) {
 		setStatusMessage(prompt, buffer);
@@ -778,19 +807,19 @@ void drawRows(struct ABUF *bff) {
 		if (fileRow >= g_Configuration.numberRows) {
 			if (g_Configuration.numberRows == 0 && y == g_Configuration.screenRows / 2) {
 				char welcomeMessage[80];
-				int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie %s, the worst text editor ever", VERSION);
+				int welcomeLength = snprintf(welcomeMessage, sizeof(welcomeMessage), "Charlie %s, a little bad text editor", VERSION);
 				if (welcomeLength > g_Configuration.screenCols) welcomeLength = g_Configuration.screenCols;
 				
 				int padding = (g_Configuration.screenCols - welcomeLength) / 2;
 				if (padding) {
-					bufferAppend(bff, COLUMN_SYMBOL, 1);
+//					bufferAppend(bff, COLUMN_SYMBOL, 1);
 					padding--;
 				}
 				while (padding--) bufferAppend(bff, " ", 1);
 				bufferAppend(bff, welcomeMessage, welcomeLength);
-			} else {
-				bufferAppend(bff, COLUMN_SYMBOL, 1); // this became an apendice
-			}
+			}// else {
+//				bufferAppend(bff, COLUMN_SYMBOL, 1); // this became an apendice, but i'll keep it here in case I change my mindd
+//			}
 		} else {
 			int length = g_Configuration.rows[fileRow].rsize - g_Configuration.colsOff;
 			
@@ -1076,15 +1105,17 @@ void insertRow(int at, char *string, size_t length) {
 int syntaxToColour(int highlight) {
 	switch (highlight) {
 		case HL_KEYWORD1:
-			return 35;
+			return 94;
 		case HL_KEYWORD2:
-			return 34;
+			return 92;
+		case HL_KEYWORD3:
+			return 35;
 		case HL_COMMENT:
 			return 90;
 		case HL_NUMBER:
-			return 31;
+			return 91;
 		case HL_STRING:
-			return 35;
+			return 95;
 		case HL_MATCH:
 			return 34;
 		default:
@@ -1117,7 +1148,7 @@ void selectSyntaxHighlight(void) {
 }
 
 int is_separator(int c) {
-	return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];", c) != NULL;
+	return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];:", c) != NULL;
 }
 void updateSyntax(ROW *row) {
 	row->highlight = realloc(row->highlight, row->rsize);
@@ -1172,9 +1203,16 @@ void updateSyntax(ROW *row) {
 			for (j = 0; keywords[j]; j++) {
 				int klen = strlen(keywords[j]);
 				int kw2 = keywords[j][klen - 1] == '|';
-				if (kw2) klen--;
+				int kw3 = keywords[j][klen - 1] == '/';
+				if (kw2) klen--; if (kw3) klen--;
 				if (!strncmp(&row->render[i], keywords[j], klen) && is_separator(row->render[i + klen])) {
-					memset(&row->highlight[i], kw2 ? HL_KEYWORD2 : HL_KEYWORD1, klen);
+//					memset(&row->highlight[i], kw2 ? HL_KEYWORD2 : HL_KEYWORD1, klen);
+					if (kw2)
+						memset(&row->highlight[i], HL_KEYWORD2, klen);
+					else if (kw3)
+						memset(&row->highlight[i], HL_KEYWORD3, klen);
+					else
+						memset(&row->highlight[i], HL_KEYWORD1, klen);
 					i += klen;
 					break;
 				}
