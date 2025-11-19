@@ -526,27 +526,35 @@ char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int)) {
 			buffer_size = 0;
 			
 			if (g_Configuration.filename != NULL) {
-//				char *final_buffer = (char*)malloc(strlen(g_Configuration.filename) + 1);
-//				if (final_buffer == NULL) break;
-//				snprintf(final_buffer, strlen(g_Configuration.filename) + 1, "%s", g_Configuration.filename);
-//				
-//				int pos = strlen(final_buffer) - 1;
-//				while (final_buffer[pos] != '/' && pos > 0) {
-//					rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorY, final_buffer[pos]);
-//					final_buffer[pos - 1] = '\0';
-//					--pos;
-//				}
-//				
-//				final_buffer = (char*)malloc(strlen(g_Configuration.filename));
-//				strcat(final_buffer, g_Configuration.filename);
-//				int poss = strlen(g_Configuration.filename) - 1; if (poss < 0) break;
-//				while (poss > (int)(strlen(g_Configuration.filename) - strlen(isolated_filename))) {
-//					memmove(&final_buffer[poss], &final_buffer[poss + 1], strlen(g_Configuration.filename) - poss);
-//					--poss;
-//				}
+				size_t filename_length = strlen(g_Configuration.filename);
 				
-				size_t filename_length = strlen(g_Configuration.filename);//strlen(g_Configuration.filename) - strlen(isolated_filename);
-				buffer_size = filename_length + 1;
+				char *final_buffer = NULL;
+				final_buffer = (char*)malloc(filename_length);
+				memcpy(final_buffer, g_Configuration.filename, filename_length);
+				if (final_buffer == NULL) break;
+				
+//				int final_buffer_size = strlen(final_buffer);
+//				int pos = filename_length;
+//				while (pos >= 0) {
+//					if (final_buffer[pos] == '/')
+//						break;
+//					final_buffer[pos - 1] = '';
+//					memmove(&final_buffer[pos - 1], &final_buffer[pos], final_buffer_size - pos);
+//					final_buffer_size--;
+					
+//					rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, final_buffer[pos]);
+//					if (final_buffer[pos] == '/')
+//						rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, 'B');
+//					pos--;
+//				}
+				char *last = strrchr(final_buffer, '/');
+				if (last != NULL)
+					*last = '\0';
+				
+				buffer_size = strlen(final_buffer) + 1;
+				
+//				for (int i=0; i<(int)strlen(last); ++i)
+//					rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, last[i]);
 				
 				buffer = (char*)malloc(buffer_size + 1);
 				if (buffer == NULL) {
@@ -554,7 +562,7 @@ char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int)) {
 					return NULL;
 				}
 				buffer[buffer_size] = '\0';
-				snprintf(buffer, buffer_size, "%s", g_Configuration.filename);
+				snprintf(buffer, buffer_size, "%s", final_buffer);
 				buffer_length = buffer_size - 1;
 			} else {
 				buffer_size = 128; buffer_length = 0;
