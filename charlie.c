@@ -14,6 +14,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 
+#include <libgen.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -533,37 +534,17 @@ char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int)) {
 				memcpy(final_buffer, g_Configuration.filename, filename_length);
 				if (final_buffer == NULL) break;
 				
-//				int final_buffer_size = strlen(final_buffer);
-//				int pos = filename_length;
-//				while (pos >= 0) {
-//					if (final_buffer[pos] == '/')
-//						break;
-//					final_buffer[pos - 1] = '';
-//					memmove(&final_buffer[pos - 1], &final_buffer[pos], final_buffer_size - pos);
-//					final_buffer_size--;
-					
-//					rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, final_buffer[pos]);
-//					if (final_buffer[pos] == '/')
-//						rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, 'B');
-//					pos--;
-//				}
-				char *last = strrchr(final_buffer, '/');
-				if (last != NULL)
-					*last = '\0';
-				
-				buffer_size = strlen(final_buffer) + 1;
-				
-//				for (int i=0; i<(int)strlen(last); ++i)
-//					rowInsertChar(&g_Configuration.rows[g_Configuration.cursorY], g_Configuration.cursorX, last[i]);
-				
-				buffer = (char*)malloc(buffer_size + 1);
+				char *path = dirname(final_buffer);
+				buffer_size = strlen(path) + 1;
+				buffer = (char*)malloc(buffer_size);
 				if (buffer == NULL) {
 					setStatusMessage("failed to malloc memory to prompt's string buffer.");
 					return NULL;
 				}
 				buffer[buffer_size] = '\0';
-				snprintf(buffer, buffer_size, "%s", final_buffer);
+				snprintf(buffer, buffer_size, "%s", path);
 				buffer_length = buffer_size - 1;
+				free(final_buffer);
 			} else {
 				buffer_size = 128; buffer_length = 0;
 				buffer = (char*)malloc(buffer_size);
