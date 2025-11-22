@@ -807,7 +807,7 @@ void drawRows(struct ABUF *bff) {
 				while (padding--) bufferAppend(bff, " ", 1);
 				bufferAppend(bff, welcomeMessage, welcomeLength);
 			}// else {
-//				bufferAppend(bff, COLUMN_SYMBOL, 1); // this became an apendice, but i'll keep it here in case I change my mindd
+//				bufferAppend(bff, COLUMN_SYMBOL, 1); // this became an apendice, but i'll keep it here in case I change my mind
 //			}
 		} else {
 			int length = g_Configuration.rows[fileRow].rsize - g_Configuration.colsOff;
