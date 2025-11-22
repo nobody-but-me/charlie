@@ -25,6 +25,7 @@
 #include <errno.h>
 
 #define BACKUP_NECESSARY_CHARACTERS 512
+#define BACKUP_STRING ".backup"
 #define COLUMN_SYMBOL ""
 #define VERSION "0.0.6"
 #define QUIT_TIMES 1
@@ -720,6 +721,23 @@ void shell(void) {
 	return;
 }
 
+static void backupRemove(void) {
+	if (g_Configuration.filename == NULL)
+		return;
+	
+	int backup_length = strlen(g_Configuration.filename) + strlen(BACKUP_STRING) + 1;
+	char *backup_filename = (char*)malloc(backup_length);
+	
+	snprintf(backup_filename, backup_length, "%s%s", g_Configuration.filename, BACKUP_STRING);
+	if (remove(backup_filename) != 0) {
+		setStatusMessage("Failed to remove backup file.");
+		return;
+	}
+	setStatusMessage("%s backup file removed.", backup_filename);
+    free(backup_filename);
+	return;
+}
+
 void command(void) {
 	char *command = prompt("Exec. command: %s", PC_COMMAND, NULL);
 	if (command == NULL) {
@@ -738,7 +756,8 @@ void command(void) {
 	else if (strcmp(command, "humans-apes?") == 0 || strcmp(command, "humans-apes") == 0) { setStatusMessage("Yes, Miranda. We are all apes."); return; }
 	else if (strcmp(command, "center-screen") == 0) { center_screen(); setStatusMessage("Screen centered."); return; }
 	else if (strcmp(command, "current-line") == 0) { setStatusMessage(" %d ", g_Configuration.cursorY); return; }
-	else if (strcmp(command, "save-backup") == 0) { backupSave(); return; }
+	else if (strcmp(command, "remove-backup") == 0 || strcmp(command, "backup-remove") == 0) { backupRemove(); return; }
+	else if (strcmp(command, "save-backup") == 0 || strcmp(command, "backup-save") == 0) { backupSave(); return; }
 	else if (strcmp(command, "goto-line") == 0) { goto_line(); return; }
 	else if (strcmp(command, "open") == 0) { file_open(); return; }
 	else if (strcmp(command, "shell") == 0) { shell(); return; }
@@ -1098,13 +1117,13 @@ int syntaxToColour(int highlight) {
 		case HL_KEYWORD2:
 			return 92;
 		case HL_KEYWORD3:
-			return 35;
+			return 33;
 		case HL_COMMENT:
 			return 90;
 		case HL_NUMBER:
 			return 91;
 		case HL_STRING:
-			return 95;
+			return 35;
 		case HL_MATCH:
 			return 34;
 		default:
@@ -1265,12 +1284,11 @@ void backupSave(void) {
 		return;
 	int length;
 	char *buffer = rowsToString(&length);
-	char *backup_symbol = ".backup";
 	
-	int backup_length = strlen(g_Configuration.filename) + strlen(backup_symbol) + 1;
+	int backup_length = strlen(g_Configuration.filename) + strlen(BACKUP_STRING) + 1;
 	char *backup_filename = (char*)malloc(backup_length);
 	
-	snprintf(backup_filename, backup_length, "%s%s", g_Configuration.filename, backup_symbol);
+	snprintf(backup_filename, backup_length, "%s%s", g_Configuration.filename, BACKUP_STRING);
 	int fd = open(backup_filename, O_RDWR | O_CREAT, 0644);
 	if (fd != -1) {
 		if (ftruncate(fd, length) != -1) {
