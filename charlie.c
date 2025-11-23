@@ -13,6 +13,7 @@
 
 #include <sys/ioctl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 
 #include <libgen.h>
 #include <stdbool.h>
@@ -536,14 +537,14 @@ char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int)) {
 				if (final_buffer == NULL) break;
 				
 				char *path = dirname(final_buffer);
-				buffer_size = strlen(path) + 1;
+				buffer_size = strlen(path) + 2;
 				buffer = (char*)malloc(buffer_size);
 				if (buffer == NULL) {
 					setStatusMessage("failed to malloc memory to prompt's string buffer.");
 					return NULL;
 				}
 				buffer[buffer_size] = '\0';
-				snprintf(buffer, buffer_size, "%s", path);
+				snprintf(buffer, buffer_size, "%s/", path);
 				buffer_length = buffer_size - 1;
 				free(final_buffer);
 			} else {
@@ -1345,12 +1346,21 @@ void editorOpen(const char *file_path) {
 		setStatusMessage("File not found");
 		return;
 	}
+//	struct stat s;
+//	if (stat(file_path, &s) == 0) {
+//		if  (s.st_mode & S_IFDIR)
+			// file is a directory
+//		else if (s.st_mode & S_IFREG)
+			// file is a.. well. file
+//		else
+			// anything else
+//	}
 	init();
 	
 	free(g_Configuration.filename); g_Configuration.filename = strdup(file_path);
 	g_Configuration.filename = strdup(file_path);
 	selectSyntaxHighlight();
-
+	
     size_t capacity = 0;
     char *line = NULL;
     ssize_t length;
