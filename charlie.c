@@ -162,7 +162,7 @@ void freeRow(ROW *row);
 void setStatusMessage(const char *formated_string, ...);
 void drawStatusMessage(struct ABUF *bff);
 
-void center_screen(void);
+void centerScreen(void);
 
 char *prompt(char *prompt, int prompt_type, void (*callback)(char *, int));
 void file_open(void);
@@ -755,7 +755,7 @@ void command(void) {
 	else if (strcmp(command, "backup-mode") == 0) { g_doBackups = !g_doBackups; g_doBackups ? setStatusMessage("Backup-mode enabled") : setStatusMessage("Backup-mode disabled"); return; }
 	else if (strcmp(command, "version") == 0 || strcmp(command, "charlie_version") == 0) { setStatusMessage("Current Charlie Version: %s", VERSION); return; }
 	else if (strcmp(command, "humans-apes?") == 0 || strcmp(command, "humans-apes") == 0) { setStatusMessage("Yes, Miranda. We are all apes."); return; }
-	else if (strcmp(command, "center-screen") == 0) { center_screen(); setStatusMessage("Screen centered."); return; }
+	else if (strcmp(command, "center-screen") == 0) { centerScreen(); setStatusMessage("Screen centered."); return; }
 	else if (strcmp(command, "current-line") == 0) { setStatusMessage(" %d ", g_Configuration.cursorY); return; }
 	else if (strcmp(command, "remove-backup") == 0 || strcmp(command, "backup-remove") == 0) { backupRemove(); return; }
 	else if (strcmp(command, "save-backup") == 0 || strcmp(command, "backup-save") == 0) { backupSave(); return; }
@@ -926,11 +926,14 @@ void control(void) {
 	return;
 }
 
-void center_screen(void) {
-	// that's gross.
-	int new_position = g_Configuration.cursorY - (g_Configuration.screenRows / 2) + 1;
-	if ((new_position * -1) < g_Configuration.rowsOff)
-		g_Configuration.rowsOff = new_position;
+void centerScreen(void) {
+	int new_position = g_Configuration.cursorY - (g_Configuration.screenRows / 2) - 1;
+	if (new_position > 0) {
+		if (new_position > g_Configuration.screenRows / 2)
+			g_Configuration.rowsOff = new_position;
+		else
+			g_Configuration.rowsOff = 0;
+	}
 	return;
 }
 void keyPress(void) {
@@ -1016,7 +1019,7 @@ void keyPress(void) {
 	    	break;
 		
 		case CTRL_KEY('l'):
-			center_screen();
+			centerScreen();
 	    	break;
 	
 		default:
