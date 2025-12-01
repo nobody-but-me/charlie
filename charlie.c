@@ -206,7 +206,8 @@ char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "bre
 								"NULL", "return", "#include", "case", "false", "union", "volatile", "goto", "default",
 								
 								"true|", "bool|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
-								"#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", 
+								"#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", "uint8_t|",
+								"uint16_t|", "uint32_t|", "uint64_t|",
 								
 								"const/",
 								NULL
@@ -216,8 +217,9 @@ char *g_CppHighlightKeywords[] = {"switch", "if", "else", "for", "continue", "br
 								  "class", "NULL", "return", "#include", "case", "false", "once", "union", "namespace", "volatile",
 								  "constexpr", "static_cast", "dynamic_cast", "const_cast", "using", "goto", "default",
 								 
-								  "true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
-								  "#ifdef|", "bool|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|",
+								  "true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|", "short|"
+								  "#ifdef|", "bool|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", "uint8_t|",
+								  "uint16_t|", "uint32_t|", "uint64_t|",
 								  
 								  "const/",
 								  NULL
@@ -790,7 +792,7 @@ void drawStatusBar(struct ABUF *bff) {
 						lines_percentage,
 						g_Configuration.cursorY, g_Configuration.numberRows,
 						g_Configuration.cursorX, g_Configuration.screenCols);
-	int rlength = snprintf(rstatus, sizeof(rstatus), "%s", g_Configuration.syntax ? g_Configuration.syntax->filetype : "no syntax");
+	int rlength = snprintf(rstatus, sizeof(rstatus), "%s", g_Configuration.syntax ? g_Configuration.syntax->filetype : " no syntax ");
     
     if (length > g_Configuration.screenCols)
 		length = g_Configuration.screenCols;
