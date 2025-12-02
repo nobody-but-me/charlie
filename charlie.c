@@ -202,18 +202,8 @@ char *g_cppExtensions[] = { ".cpp", ".hpp", ".cc", ".hh", NULL };
 char *g_cExtensions[] = { ".c", ".h", NULL };
 
 // NOTE: it would be interesting to separate it in a different file or something.
-char *g_ChighlightKeywords[] = { "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
-								"NULL", "return", "#include", "case", "false", "union", "volatile", "goto", "default",
-								
-								"true|", "bool|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|",
-								"#ifdef|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", "uint8_t|",
-								"uint16_t|", "uint32_t|", "uint64_t|",
-								
-								"const/",
-								NULL
-							   };
-
-char *g_CppHighlightKeywords[] = {"switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
+char *g_ChighlightKeywords[] = {
+							      "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
 								  "class", "NULL", "return", "#include", "case", "false", "once", "union", "namespace", "volatile",
 								  "constexpr", "static_cast", "dynamic_cast", "const_cast", "using", "goto", "default",
 								 
@@ -236,7 +226,7 @@ struct langSyntax g_highlightDatabase[] = {
 	{
 		"//",
 		g_cppExtensions,
-		g_CppHighlightKeywords,
+		g_ChighlightKeywords,
 		"| C++ |",
 		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
 	}
