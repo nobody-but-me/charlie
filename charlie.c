@@ -920,12 +920,11 @@ void control(void) {
 
 void centerScreen(void) {
 	int new_position = g_Configuration.cursorY - (g_Configuration.screenRows / 2) - 1;
-	if (new_position > 0) {
-		if (new_position > g_Configuration.screenRows / 2)
-			g_Configuration.rowsOff = new_position;
-		else
-			g_Configuration.rowsOff = 0;
-	}
+	setStatusMessage("%d", new_position);
+	if(new_position>0)
+		g_Configuration.rowsOff=new_position;
+	else
+		g_Configuration.rowsOff=0;
 	return;
 }
 void keyPress(void) {
