@@ -88,6 +88,8 @@ enum KEYS {
     LEFT        ,
     DOWN        ,
     UP          ,
+	
+	RIGHT_WORD  ,
     
     PAGE_DOWN   ,
     PAGE_UP     ,
@@ -204,14 +206,14 @@ char *g_cExtensions[] = { ".c", ".h", NULL };
 // NOTE: it would be interesting to separate it in a different file or something.
 char *g_ChighlightKeywords[] = {
 							      "switch", "if", "else", "for", "continue", "break", "while", "struct", "typedef", "static", "enum",
-								  "class", "NULL", "return", "#include", "case", "false", "once", "union", "namespace", "volatile",
-								  "constexpr", "static_cast", "dynamic_cast", "const_cast", "using", "goto", "default",
+								  "class", "NULL", "nullptr", "return", "#include", "case", "false", "once", "union", "namespace", "volatile",
+								  "static_cast", "dynamic_cast", "const_cast", "using", "goto", "default",
 								 
 								  "true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|", "short|"
 								  "#ifdef|", "bool|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", "uint8_t|",
 								  "uint16_t|", "uint32_t|", "uint64_t|",
 								  
-								  "const/",
+								  "const/","constexpr/",
 								  NULL
 								};
 
@@ -353,6 +355,17 @@ void moveCursor(int key) {
         case UP:
 			if (g_Configuration.cursorY != 0) g_Configuration.cursorY--;
 			break;
+		
+		case RIGHT_WORD:
+			if (row&&g_Configuration.cursorX<row->size)
+				while(row->chars[g_Configuration.cursorX]!=' '){
+					setStatusMessage("teste");
+					g_Configuration.cursorX++;
+				}
+			else if(g_Configuration.cursorY>0){
+				g_Configuration.cursorY++;
+				g_Configuration.cursorX=0;
+			}
     }
     row = (g_Configuration.cursorY >= g_Configuration.numberRows) ? NULL : &g_Configuration.rows[g_Configuration.cursorY];
 	
@@ -1079,6 +1092,8 @@ int readKey(void) {
 	    	case CTRL_KEY('e'): return END;
 			
 			case CTRL_KEY('v'): return PAGE_DOWN;
+			
+			case CTRL_KEY('g'): return RIGHT_WORD;
 		}
     }
     return c;
@@ -1151,7 +1166,7 @@ void selectSyntaxHighlight(void) {
 }
 
 int is_separator(int c) {
-	return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];:", c) != NULL;
+	return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];:?", c) != NULL;
 }
 void updateSyntax(ROW *row) {
 	row->highlight = realloc(row->highlight, row->rsize);
