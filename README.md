@@ -12,6 +12,8 @@ designed to fit only and exclusively my needs. Despite that, any contribution is
 
 As I wrote some lines above, the project is highly inspired by kilo, which means it has no more dependencies than a C compiler and its standard library -- in the case of this project, clang 19.0.0+.
 
+It uses the VT100 stardard escape sequences as main control for cursor movement, text formatting and displaying of the text in general.
+
 # Build
 *not tested in a windows or mac environment*
 
@@ -22,6 +24,21 @@ As I wrote some lines above, the project is highly inspired by kilo, which means
 ```
 
 and follow the instructions.
+
+# FEATURES
+
+ - 12 different commands;
+ - Open, save and 'save as' system;
+ - Status bar and command bar;
+ - Syntax highlighting for C/C++ languages;
+
+# IMAGES
+
+![charlie-welcome](images/charlie-welcome.png)
+![charlie-instructions](images/charlie-instructions.png)
+![charlie-kitty](images/charlie-kitty.png)
+![charlie-xfce-terminal](images/charlie-xfce-terminal.png)
+![charlie-xterm](images/charlie-xterm.png)
 
 # TODO
 
