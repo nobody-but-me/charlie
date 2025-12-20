@@ -751,7 +751,9 @@ void command(void) {
 		return;
 	}
 	
-	if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
+	if (strcmp(command, "quit") == 0 || 
+		strcmp(command, "exit") == 0 ||
+		strcmp(command, "kill-charlie")==0) {
 		write(STDOUT_FILENO, "\x1b[2J", 4);
 		write(STDOUT_FILENO, "\x1b[H", 3);
 		exit(0);
