@@ -209,7 +209,7 @@ char *g_ChighlightKeywords[] = {
 								  "class", "NULL", "nullptr", "return", "#include", "case", "false", "once", "union", "namespace", "volatile",
 								  "static_cast", "dynamic_cast", "const_cast", "using", "goto", "default",
 								 
-								  "true|", "#pragma|", "#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|", "short|"
+								  "true|", "#pragma|", "#ifdef|","#ifndef|", "#elif|", "#endif|", "#if|", "#else|", "#define|", "int|", "long|", "short|"
 								  "#ifdef|", "bool|", "double|", "float|", "char|", "unsigned|", "signed|", "void|", "size_t|", "uint8_t|",
 								  "uint16_t|", "uint32_t|", "uint64_t|",
 								  
