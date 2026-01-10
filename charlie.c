@@ -200,6 +200,7 @@ void init(void);
 // |-                 Implementation               -|
 // \------------------------|-----------------------/
 
+char *g_HtmlExtensions[]={".html",".htm"};
 char *g_cppExtensions[] = { ".cpp", ".hpp", ".cc", ".hh", NULL };
 char *g_cExtensions[] = { ".c", ".h", NULL };
 
@@ -216,6 +217,11 @@ char *g_ChighlightKeywords[] = {
 								  "const/","constexpr/",
 								  NULL
 								};
+char *g_HtmlHighlightKeywords[]={
+		"body","image","p","h1","h2","h3",
+		
+		"html/",
+	};
 
 struct langSyntax g_highlightDatabase[] = {
 	{
@@ -230,6 +236,13 @@ struct langSyntax g_highlightDatabase[] = {
 		g_cppExtensions,
 		g_ChighlightKeywords,
 		"| C++ |",
+		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
+	},
+	{
+		"<!--",// bruh
+		g_HtmlExtensions,
+		g_HtmlHighlightKeywords,
+		"| HTML |",
 		HIGHLIGHT_NUMBERS | HIGHLIGHT_STRINGS
 	}
 };
